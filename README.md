@@ -1,56 +1,77 @@
-# Welcome to your Expo app 👋
+# ReadBibleTrack
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+A shared Bible reading tracker for couples, families and small circles of friends.
+One Expo codebase serving iOS, Android and the web.
 
-## Get started
+The point of the app is not the reader — it is the circle. If a feature works
+just as well alone, it is not a priority.
 
-1. Install dependencies
+## Running it
 
-   ```bash
-   npm install
-   ```
-
-2. Start the app
-
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
-
-```bash
-npm run reset-project
+```sh
+npm install
+npm start          # then press i, a, or w
+npm run web        # web only
+npm test           # unit tests, no test framework needed
+npm run typecheck
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+`npm start` prints a QR code. Scan it with Expo Go to run on a real phone —
+that works today without Xcode. iOS *simulator* builds need the full Xcode
+install, not just the Command Line Tools.
 
-### Other setup steps
+## Layout
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+```
+src/
+  app/          Expo Router routes — these become both screens and web URLs
+  bible/        canon, verse ids, range algebra, reference parsing
+  components/   themed primitives
+  constants/    design tokens (theme.ts)
+  hooks/
+types/          ambient declarations
+```
 
-## Learn more
+## Verse ids
 
-To learn more about developing your project with Expo, look at the following resources:
+Every verse in the canon is one sortable integer:
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+```
+book * 1_000_000  +  chapter * 1_000  +  verse
 
-## Join the community
+Genesis 1:1      ->  1_001_001
+John 3:16        -> 43_003_016
+Revelation 22:21 -> 66_022_021
+```
 
-Join our community of developers creating universal apps.
+Reading progress is stored as `[start, end]` ranges over these ids, never as a
+list of verses and never as a mutable percentage. Two things follow:
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+- **Progress is translation-independent.** Reading Genesis in Malayalam writes
+  exactly the same rows as reading it in English, so a family reading in
+  different languages still shares one progress bar.
+- **Group progress is one SQL aggregate**, not a row per verse per person.
+
+Because no chapter has more than 176 verses (Psalm 119), `999` is a safe open
+upper bound for a chapter. That is why `chapterSpan` and `bookSpan` work without
+any versification data. Counting *actual* verses does need that data, and will
+come from the ingestion script — versification differs between translations.
+
+`src/bible/verse-id.ts` is the load-bearing file. The book numbering in
+`canon.ts` is baked into every id ever stored, so it must never be renumbered.
+
+## Scripture text
+
+Text is **bundled in the app** as a read-only SQLite file per translation, not
+served from our backend. It works offline, costs nothing per read, and keeps
+the database free of scripture entirely.
+
+Only translations that are public domain or CC BY-SA get bundled. Every shipped
+translation must be listed in `LICENSES.md` with its source URL, licence and
+download date. Copyrighted versions (NIV, ESV) can only come from an API under
+licence and cannot be bundled offline.
+
+## Status
+
+Phase 0. The canon, verse ids, range algebra and reference parsing are in place
+and tested. Next: the USFM ingestion script, then the reader.

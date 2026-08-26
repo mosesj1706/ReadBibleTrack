@@ -1,98 +1,93 @@
-import * as Device from 'expo-device';
-import { Platform, StyleSheet } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { AnimatedIcon } from '@/components/animated-icon';
-import { HintRow } from '@/components/hint-row';
+import { formatReference, parseReference } from '@/bible/reference.ts';
+import { normaliseRanges, subtractRanges } from '@/bible/verse-id.ts';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { WebBadge } from '@/components/web-badge';
-import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
+import { Fonts, MaxContentWidth, Spacing } from '@/constants/theme';
+import { useTheme } from '@/hooks/use-theme';
 
-function getDevMenuHint() {
-  if (Platform.OS === 'web') {
-    return <ThemedText type="small">use browser devtools</ThemedText>;
-  }
-  if (Device.isDevice) {
-    return (
-      <ThemedText type="small">
-        shake device or press <ThemedText type="code">m</ThemedText> in terminal
-      </ThemedText>
-    );
-  }
-  const shortcut = Platform.OS === 'android' ? 'cmd+m (or ctrl+m)' : 'cmd+d';
-  return (
-    <ThemedText type="small">
-      press <ThemedText type="code">{shortcut}</ThemedText>
-    </ThemedText>
+/**
+ * A stand-in until the plan engine arrives in phase 2. It exists so this screen
+ * exercises the real reference and range code rather than hard-coded strings.
+ */
+const SAMPLE_DAY = ['John 1', 'Psalm 1', 'Proverbs 1:1-7'];
+
+function todaysReading() {
+  const ranges = normaliseRanges(
+    SAMPLE_DAY.map(parseReference).filter((r) => r !== undefined),
   );
+  return {
+    ranges,
+    label: ranges.map((r) => formatReference(r)).join(' · '),
+  };
 }
 
-export default function HomeScreen() {
+export default function TodayScreen() {
+  const theme = useTheme();
+  const { ranges, label } = todaysReading();
+
+  // Nothing is logged yet, so everything in today's reading is still ahead.
+  const remaining = subtractRanges(ranges, []);
+  const done = remaining.length === 0;
+
+  const today = new Date().toLocaleDateString(undefined, {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+  });
+
   return (
-    <ThemedView style={styles.container}>
-      <SafeAreaView style={styles.safeArea}>
-        <ThemedView style={styles.heroSection}>
-          <AnimatedIcon />
-          <ThemedText type="title" style={styles.title}>
-            Welcome to&nbsp;Expo
+    <ThemedView style={styles.screen}>
+      <SafeAreaView style={styles.container}>
+        <View style={styles.header}>
+          <ThemedText type="small" themeColor="textFaint" style={styles.eyebrow}>
+            {today}
           </ThemedText>
-        </ThemedView>
+          <ThemedText type="title" style={[styles.title, { fontFamily: Fonts.serif }]}>
+            Today&rsquo;s reading
+          </ThemedText>
+        </View>
 
-        <ThemedText type="code" style={styles.code}>
-          get started
-        </ThemedText>
+        <View style={[styles.card, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}>
+          <ThemedText type="subtitle" style={[styles.passage, { fontFamily: Fonts.serif }]}>
+            {label}
+          </ThemedText>
+          <ThemedText type="small" themeColor="textSecondary">
+            {done ? 'Finished for today.' : `${ranges.length} passages, not started.`}
+          </ThemedText>
+        </View>
 
-        <ThemedView type="backgroundElement" style={styles.stepContainer}>
-          <HintRow
-            title="Try editing"
-            hint={<ThemedText type="code">src/app/index.tsx</ThemedText>}
-          />
-          <HintRow title="Dev tools" hint={getDevMenuHint()} />
-          <HintRow
-            title="Fresh start"
-            hint={<ThemedText type="code">npm run reset-project</ThemedText>}
-          />
-        </ThemedView>
-
-        {Platform.OS === 'web' && <WebBadge />}
+        <View style={[styles.note, { borderLeftColor: theme.accent }]}>
+          <ThemedText type="small" themeColor="textSecondary">
+            Phase 0 groundwork is in place: the canon, verse ids and range algebra.
+            The reader, plans and circles come next.
+          </ThemedText>
+        </View>
       </SafeAreaView>
     </ThemedView>
   );
 }
 
 const styles = StyleSheet.create({
+  screen: { flex: 1, flexDirection: 'row', justifyContent: 'center' },
   container: {
     flex: 1,
-    justifyContent: 'center',
-    flexDirection: 'row',
-  },
-  safeArea: {
-    flex: 1,
-    paddingHorizontal: Spacing.four,
-    alignItems: 'center',
-    gap: Spacing.three,
-    paddingBottom: BottomTabInset + Spacing.three,
+    width: '100%',
     maxWidth: MaxContentWidth,
-  },
-  heroSection: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    flex: 1,
     paddingHorizontal: Spacing.four,
     gap: Spacing.four,
   },
-  title: {
-    textAlign: 'center',
+  header: { paddingTop: Spacing.six, gap: Spacing.two },
+  eyebrow: { textTransform: 'uppercase', letterSpacing: 1.2 },
+  title: { fontSize: 38, lineHeight: 42, fontWeight: '400' },
+  card: {
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: Spacing.two,
+    padding: Spacing.four,
+    gap: Spacing.two,
   },
-  code: {
-    textTransform: 'uppercase',
-  },
-  stepContainer: {
-    gap: Spacing.three,
-    alignSelf: 'stretch',
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.four,
-    borderRadius: Spacing.four,
-  },
+  passage: { fontSize: 24, lineHeight: 32, fontWeight: '400' },
+  note: { borderLeftWidth: 2, paddingLeft: Spacing.three },
 });
