@@ -38,6 +38,22 @@ for, rather than storing a flag.
 not part of `npm test`, which stays free of infrastructure. Run it after any
 change to a policy, a grant, or a table in `supabase/migrations/`.
 
+### Sending mail
+
+Supabase's built-in mailer is capped at two emails an hour, which is why
+`[auth.rate_limit] email_sent` cannot be raised until `[auth.email.smtp]` is
+enabled. Both live in `supabase/config.toml` and reach the hosted project
+through `supabase config push`, not through the dashboard — the dashboard and
+this file will fight over the same settings if you use both.
+
+The credentials come from the environment. Keep them in `.env.supabase.local`
+(git-ignored by `.env*.local`) and **not** in `.env.local`, which Expo loads
+into the app bundle; an SMTP key shipped to clients is the ability to send
+mail as you.
+
+`config push` sends the whole file, so read the diff before running it against
+production.
+
 Two traps this schema has already hit, both worth remembering:
 
 - A `RETURNING` clause is evaluated before `AFTER INSERT` triggers fire. A

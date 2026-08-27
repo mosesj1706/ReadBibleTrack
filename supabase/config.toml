@@ -195,8 +195,12 @@ password_requirements = ""
 # rp_origins = ["http://127.0.0.1:3000"]
 
 [auth.rate_limit]
-# Number of emails that can be sent per hour. Requires auth.email.smtp to be enabled.
-email_sent = 2
+# Number of emails that can be sent per hour. Requires auth.email.smtp to be
+# enabled — Supabase's built-in mailer is capped at 2, which is unusable for
+# anything but a demo: one mistyped address and you wait half an hour. With a
+# real sender behind it this is the provider's limit that matters, not this
+# one, so it is set to a number that will not be the thing in the way.
+email_sent = 100
 # Number of SMS messages that can be sent per hour. Requires auth.sms to be enabled.
 sms_sent = 30
 # Number of anonymous sign-ins that can be made per hour per IP address. Requires enable_anonymous_sign_ins = true.
@@ -233,15 +237,24 @@ otp_length = 6
 # Number of seconds before the email OTP expires (defaults to 1 hour).
 otp_expiry = 3600
 
-# Use a production-ready SMTP server
-# [auth.email.smtp]
-# enabled = true
-# host = "smtp.sendgrid.net"
-# port = 587
-# user = "apikey"
-# pass = "env(SENDGRID_API_KEY)"
-# admin_email = "admin@email.com"
-# sender_name = "Admin"
+# A real sender, so sign-in codes actually arrive.
+#
+# Only `enabled` and the credentials differ between providers; the shape is the
+# same for Brevo, Resend, Mailgun, SendGrid and the rest. The password is read
+# from the environment and never committed — see .env.example — because a
+# committed SMTP key is a committed ability to send mail as you.
+#
+# This block is pushed to the hosted project with `supabase config push`. It
+# does nothing locally: local mail goes to Mailpit on :54324 and should keep
+# doing so, because development ought not to be able to email real people.
+[auth.email.smtp]
+enabled = true
+host = "env(SMTP_HOST)"
+port = 587
+user = "env(SMTP_USER)"
+pass = "env(SMTP_PASS)"
+admin_email = "env(SMTP_SENDER)"
+sender_name = "ReadBibleTrack"
 
 # A 6-digit code rather than a magic link: deep-linking back into a React
 # Native app is fiddly, and a code works the same on every platform.
