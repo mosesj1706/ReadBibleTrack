@@ -39,10 +39,20 @@ export default function TodayScreen() {
   const carryOn = planned ? resumeAt(portion, read) : (bookmark ?? resumeAt([canonSpan()], read));
   const readEverything = countVerses(read);
 
+  // A taste of what you are about to read: the plan's portion if there is
+  // one, otherwise the place you would resume from. Without a plan this used
+  // to show nothing at all, which left the screen with less on it than the
+  // person had actually asked for.
   const opening = portion[0]
     ? { start: portion[0].start, end: Math.min(portion[0].start + 3, portion[0].end) }
-    : undefined;
+    : carryOn
+      ? { start: carryOn, end: carryOn + 3 }
+      : undefined;
   const openingVerses = usePassage(opening).verses;
+  // Two columns only when the second one has something in it. With no plan
+  // there is no passage to preview, and splitting anyway left the whole right
+  // half of the display empty with the cards hugging the left edge.
+  const split = wide && openingVerses.length > 0;
 
   const today = new Date().toLocaleDateString(undefined, {
     weekday: 'long',
@@ -54,7 +64,7 @@ export default function TodayScreen() {
     <ThemedView style={styles.screen}>
       <SafeAreaView style={styles.container}>
         <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-          <View style={styles.header}>
+          <View style={[styles.header, wide && !split ? styles.solo : undefined]}>
             <ThemedText type="small" themeColor="textFaint" style={styles.eyebrow}>
               {today}
             </ThemedText>
@@ -63,8 +73,8 @@ export default function TodayScreen() {
             </ThemedText>
           </View>
 
-          <View style={wide ? styles.split : undefined}>
-          <View style={wide ? styles.column : undefined}>
+          <View style={split ? styles.split : undefined}>
+          <View style={wide ? [styles.column, split ? undefined : styles.solo] : undefined}>
           <Link href="/plan" asChild>
             <Pressable
               accessibilityRole="link"
@@ -139,8 +149,8 @@ export default function TodayScreen() {
 
           </View>
 
-          <View style={wide ? styles.column : undefined}>
           {openingVerses.length > 0 ? (
+          <View style={wide ? styles.column : undefined}>
             <View
               style={[
                 styles.card,
@@ -149,8 +159,8 @@ export default function TodayScreen() {
             >
               <ScriptureText verses={openingVerses} />
             </View>
-          ) : null}
           </View>
+          ) : null}
           </View>
         </ScrollView>
       </SafeAreaView>
@@ -167,6 +177,10 @@ const styles = StyleSheet.create({
   // the column that holds the passage itself.
   split: { flexDirection: 'row', gap: Spacing.four, alignItems: 'flex-start' },
   column: { flex: 1, gap: Spacing.four, maxWidth: MaxContentWidth },
+  // When there is only one column, it and the heading above it centre
+  // together rather than sitting against the left edge of a display neither
+  // of them is filling.
+  solo: { maxWidth: MaxContentWidth, width: '100%', alignSelf: 'center' },
   eyebrow: { textTransform: 'uppercase', letterSpacing: 1.2 },
   title: { fontSize: 38, lineHeight: 42, fontWeight: '400' },
   planRow: {
