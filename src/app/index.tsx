@@ -63,10 +63,14 @@ export default function TodayScreen() {
   // one, otherwise the place you would resume from. Without a plan this used
   // to show nothing at all, which left the screen with less on it than the
   // person had actually asked for.
+  // Four verses is a taste on a phone and a stub on a display, where the
+  // column beside it is a thousand points tall and mostly empty. A wide screen
+  // gets enough of the passage to actually begin reading it.
+  const taste = wide ? 15 : 3;
   const opening = portion[0]
-    ? { start: portion[0].start, end: Math.min(portion[0].start + 3, portion[0].end) }
+    ? { start: portion[0].start, end: Math.min(portion[0].start + taste, portion[0].end) }
     : carryOn
-      ? { start: carryOn, end: carryOn + 3 }
+      ? { start: carryOn, end: carryOn + taste }
       : undefined;
   const openingVerses = usePassage(opening).verses;
   // Two columns only when the second one has something in it. With no plan

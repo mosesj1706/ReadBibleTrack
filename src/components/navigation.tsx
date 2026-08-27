@@ -14,12 +14,15 @@ import { router, usePathname } from 'expo-router';
 import { StyleSheet, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Tappable } from '@/components/motion';
+import { canonSpan } from '@/bible/verse-id.ts';
+import { countVerses, progressThrough } from '@/bible/versification.ts';
+import { Animated, Tappable, useFill } from '@/components/motion';
 import { TABS, slideDirection, type Slide } from '@/navigation/order.ts';
-import { Glass } from '@/components/surfaces';
+import { Glass, Ground } from '@/components/surfaces';
 import { ThemedText } from '@/components/themed-text';
-import { MaxPageWidth, Spacing } from '@/constants/theme';
+import { Fonts, MaxPageWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { useProgress } from '@/progress/provider';
 
 /** Wide enough that a bottom bar would look stranded. */
 const WIDE = 900;
@@ -101,12 +104,26 @@ export function AppNavigation({ children }: { readonly children: React.ReactNode
     // to the far edge and centring the column in whatever is left makes them
     // read as two unrelated things with a void between them.
     return (
-      <View style={styles.wideOuter}>
+      // The ground is painted across the whole window rather than only inside
+      // the centred column: the screens paint their own, but that one is
+      // bounded by this layout, so everything either side of it had no
+      // background at all and showed the browser's white through.
+      //
+      // It wraps the centring row rather than being it. Ground puts its
+      // children inside a flex:1 view of its own, which swallows a
+      // justifyContent set on the outside and leaves the rail against the
+      // left edge.
+      <Ground>
+        <View style={styles.wideOuter}>
         <View style={styles.wideInner}>
-          <Glass style={styles.rail}>{items}</Glass>
+          <Glass style={styles.rail}>
+            {items}
+            <RailSummary />
+          </Glass>
           <View style={styles.grow}>{children}</View>
         </View>
-      </View>
+        </View>
+      </Ground>
     );
   }
 
@@ -126,6 +143,50 @@ export function AppNavigation({ children }: { readonly children: React.ReactNode
   );
 }
 
+/**
+ * How far the reading has got, at the foot of the rail.
+ *
+ * The rail is tall and five items do not fill it. Rather than pad it out with
+ * decoration, it carries the one number this whole app exists to move — which
+ * also means the number is in front of you on every screen, not only on the
+ * one you go to for it.
+ */
+function RailSummary() {
+  const theme = useTheme();
+  const pathname = usePathname();
+  const { ranges } = useProgress();
+  const read = countVerses(ranges);
+  const share = progressThrough([canonSpan()], ranges);
+  const fill = useFill(share);
+
+  return (
+    <Tappable
+      accessibilityRole="link"
+      accessibilityLabel={`${read} verses read, ${(share * 100).toFixed(1)} per cent of the Bible`}
+      onPress={() => {
+        pendingDirection = slideDirection(pathname, '/progress');
+        router.navigate('/progress');
+      }}
+      style={styles.summary}
+    >
+      <ThemedText type="small" themeColor="textFaint" style={styles.summaryEyebrow}>
+        Read so far
+      </ThemedText>
+      <ThemedText type="subtitle" style={[styles.summaryCount, { fontFamily: Fonts.serif }]}>
+        {read.toLocaleString()}
+      </ThemedText>
+      <View style={[styles.summaryTrack, { backgroundColor: theme.backgroundSelected }]}>
+        <Animated.View
+          style={[styles.summaryFill, { backgroundColor: theme.accent }, fill]}
+        />
+      </View>
+      <ThemedText type="small" themeColor="textFaint">
+        {share > 0 ? `${(share * 100).toFixed(1)}% of the Bible` : 'of the whole Bible'}
+      </ThemedText>
+    </Tappable>
+  );
+}
+
 const styles = StyleSheet.create({
   grow: { flex: 1 },
   // The rail plus a full page. This used to be the rail plus the 680pt prose
@@ -134,6 +195,14 @@ const styles = StyleSheet.create({
   // still governs paragraphs — it just no longer governs the whole app.
   wideOuter: { flex: 1, flexDirection: 'row', justifyContent: 'center' },
   wideInner: { flex: 1, flexDirection: 'row', maxWidth: 176 + MaxPageWidth + Spacing.six },
+  // `auto` on top pushes the summary to the foot of the rail, so the nav items
+  // stay together at the head of it rather than being spread down the whole
+  // height.
+  summary: { marginTop: 'auto', paddingHorizontal: Spacing.three, paddingBottom: Spacing.three, gap: Spacing.half },
+  summaryEyebrow: { textTransform: 'uppercase', letterSpacing: 1.2 },
+  summaryCount: { fontSize: 26, lineHeight: 32, fontWeight: '400' },
+  summaryTrack: { height: 5, borderRadius: 3, overflow: 'hidden', marginTop: Spacing.one },
+  summaryFill: { height: '100%', borderRadius: 3 },
   rail: {
     width: 176,
     paddingTop: Spacing.four,
