@@ -137,7 +137,23 @@ export const Radius = {
 } as const;
 
 export const BottomTabInset = Platform.select({ ios: 50, android: 80 }) ?? 0;
+
+/**
+ * The measure for running text. Never widen this: a line of prose much past
+ * 680 is genuinely harder to read, and scripture is the one thing here that
+ * is read rather than scanned.
+ */
 export const MaxContentWidth = 680;
 
+/**
+ * How wide a whole screen may get.
+ *
+ * Screens that are lists, grids and cards — progress, marked verses, plans,
+ * a circle — are scanned, not read, and capping them at the prose measure
+ * left a phone-shaped strip adrift in the middle of a desktop display. They
+ * get the room; only the paragraphs inside them stay at `MaxContentWidth`.
+ */
+export const MaxPageWidth = 1100;
+
 /** Past this the reader shows its side panels rather than stacking. */
-export const WideBreakpoint = 1080;
+export const WideBreakpoint = 960;

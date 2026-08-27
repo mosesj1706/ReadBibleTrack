@@ -1,5 +1,5 @@
 import { Link } from 'expo-router';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { portionFor, resumeAt } from '@/bible/plan.ts';
@@ -9,7 +9,7 @@ import { countVerses, progressThrough } from '@/bible/versification.ts';
 import { ScriptureText } from '@/components/scripture-text';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Fonts, MaxContentWidth, Spacing } from '@/constants/theme';
+import { Fonts, MaxContentWidth, MaxPageWidth, Spacing, WideBreakpoint } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { usePlan } from '@/plans/provider';
 import { useProgress } from '@/progress/provider';
@@ -17,6 +17,10 @@ import { usePassage } from '@/scripture/provider';
 
 export default function TodayScreen() {
   const theme = useTheme();
+  const { width } = useWindowDimensions();
+  // Wide enough for two columns: what to read beside a taste of it. Stacked,
+  // the passage preview sits below the fold and may as well not be there.
+  const wide = width >= WideBreakpoint;
   const { plan, day } = usePlan();
   const { ranges: read, bookmark } = useProgress();
 
@@ -59,6 +63,8 @@ export default function TodayScreen() {
             </ThemedText>
           </View>
 
+          <View style={wide ? styles.split : undefined}>
+          <View style={wide ? styles.column : undefined}>
           <Link href="/plan" asChild>
             <Pressable
               accessibilityRole="link"
@@ -131,6 +137,9 @@ export default function TodayScreen() {
             </Link>
           ) : null}
 
+          </View>
+
+          <View style={wide ? styles.column : undefined}>
           {openingVerses.length > 0 ? (
             <View
               style={[
@@ -141,6 +150,8 @@ export default function TodayScreen() {
               <ScriptureText verses={openingVerses} />
             </View>
           ) : null}
+          </View>
+          </View>
         </ScrollView>
       </SafeAreaView>
     </ThemedView>
@@ -149,9 +160,13 @@ export default function TodayScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, flexDirection: 'row', justifyContent: 'center' },
-  container: { flex: 1, width: '100%', maxWidth: MaxContentWidth },
+  container: { flex: 1, width: '100%', maxWidth: MaxPageWidth },
   scroll: { paddingHorizontal: Spacing.four, paddingBottom: Spacing.six, gap: Spacing.four },
   header: { paddingTop: Spacing.four, gap: Spacing.two },
+  // Two columns on a display, one on a phone. The reading measure still caps
+  // the column that holds the passage itself.
+  split: { flexDirection: 'row', gap: Spacing.four, alignItems: 'flex-start' },
+  column: { flex: 1, gap: Spacing.four, maxWidth: MaxContentWidth },
   eyebrow: { textTransform: 'uppercase', letterSpacing: 1.2 },
   title: { fontSize: 38, lineHeight: 42, fontWeight: '400' },
   planRow: {

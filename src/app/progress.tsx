@@ -22,7 +22,7 @@ import {
 } from '@/bible/versification.ts';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Fonts, MaxContentWidth, Spacing } from '@/constants/theme';
+import { Fonts, MaxPageWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useProgress } from '@/progress/provider';
 
@@ -97,6 +97,7 @@ export default function ProgressScreen() {
                   {testament.name} · {Math.round((doneHere / covered) * 100)}%
                 </ThemedText>
 
+                <View style={styles.books}>
                 {books.map((book) => {
                   const range = bookRange(book.number)!;
                   const share = progressThrough([range], read);
@@ -129,6 +130,7 @@ export default function ProgressScreen() {
                     </Link>
                   );
                 })}
+                </View>
               </View>
             );
           })}
@@ -158,7 +160,7 @@ function Bar({ fraction }: { readonly fraction: number }) {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, flexDirection: 'row', justifyContent: 'center' },
-  container: { flex: 1, width: '100%', maxWidth: MaxContentWidth },
+  container: { flex: 1, width: '100%', maxWidth: MaxPageWidth },
   topBar: { paddingHorizontal: Spacing.three, paddingBottom: Spacing.two },
   leave: { minHeight: 44, justifyContent: 'center' },
   scroll: { paddingHorizontal: Spacing.four, paddingBottom: Spacing.six, gap: Spacing.three },
@@ -171,13 +173,22 @@ const styles = StyleSheet.create({
   },
   section: { gap: Spacing.half, marginTop: Spacing.two },
   eyebrow: { textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: Spacing.two },
+  // Sixty-six books in one column is a very long scroll and, on a desktop,
+  // a narrow ribbon of content with the display empty either side. They flow
+  // into as many columns as the width allows instead — three on a monitor,
+  // one on a phone. Each bar stays proportional within its own column, so
+  // Psalms still reads as the longest book.
+  books: { flexDirection: 'row', flexWrap: 'wrap', columnGap: Spacing.four },
   bookRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.two,
-    minHeight: 34,
+    minHeight: 44,
+    flexBasis: 300,
+    flexGrow: 1,
+    maxWidth: 460,
   },
-  bookName: { width: 108 },
+  bookName: { width: 132 },
   trackArea: { flex: 1, justifyContent: 'center' },
   percent: { width: 40, textAlign: 'right' },
   bar: { height: 6, borderRadius: 3, overflow: 'hidden' },

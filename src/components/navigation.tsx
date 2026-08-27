@@ -17,7 +17,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Tappable } from '@/components/motion';
 import { Glass } from '@/components/surfaces';
 import { ThemedText } from '@/components/themed-text';
-import { MaxContentWidth, Spacing } from '@/constants/theme';
+import { MaxPageWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
 /** Wide enough that a bottom bar would look stranded. */
@@ -112,10 +112,12 @@ export function AppNavigation({ children }: { readonly children: React.ReactNode
 
 const styles = StyleSheet.create({
   grow: { flex: 1 },
-  // The rail plus a comfortable reading column; wider than this is empty space,
-  // because the measure must stay near 680 whatever the display does.
+  // The rail plus a full page. This used to be the rail plus the 680pt prose
+  // measure, which made every screen a phone-shaped strip with a few hundred
+  // points of dead ground either side of it on a desktop display. The measure
+  // still governs paragraphs — it just no longer governs the whole app.
   wideOuter: { flex: 1, flexDirection: 'row', justifyContent: 'center' },
-  wideInner: { flex: 1, flexDirection: 'row', maxWidth: 176 + MaxContentWidth + Spacing.six },
+  wideInner: { flex: 1, flexDirection: 'row', maxWidth: 176 + MaxPageWidth + Spacing.six },
   rail: {
     width: 176,
     paddingTop: Spacing.four,

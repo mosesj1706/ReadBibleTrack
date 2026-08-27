@@ -14,7 +14,7 @@ import { formatReference } from '@/bible/reference.ts';
 import { countVerses } from '@/bible/versification.ts';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Fonts, MaxContentWidth, Spacing } from '@/constants/theme';
+import { Fonts, MaxPageWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { PLANS } from '@/plans/catalogue';
 import { usePlan } from '@/plans/provider';
@@ -114,17 +114,30 @@ export default function PlanScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, flexDirection: 'row', justifyContent: 'center' },
-  container: { flex: 1, width: '100%', maxWidth: MaxContentWidth },
+  container: { flex: 1, width: '100%', maxWidth: MaxPageWidth },
   topBar: { paddingHorizontal: Spacing.three, paddingBottom: Spacing.two },
   leave: { minHeight: 44, justifyContent: 'center' },
   scroll: { paddingHorizontal: Spacing.four, paddingBottom: Spacing.six, gap: Spacing.three },
   title: { fontSize: 34, lineHeight: 40, fontWeight: '400' },
-  list: { gap: Spacing.two, marginTop: Spacing.two },
+  // Plans are cards to be compared, so they sit side by side where there is
+  // room rather than in one tall column with the display empty beside it.
+  list: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.two,
+    marginTop: Spacing.two,
+  },
   option: {
     borderWidth: StyleSheet.hairlineWidth,
     borderRadius: Spacing.two,
     padding: Spacing.three,
     gap: Spacing.half,
     minHeight: 44,
+    // Grows to share a row, but never past this: without a cap a lone card
+    // left over on the last row stretches the whole width and stops looking
+    // like one of a set.
+    flexBasis: 320,
+    flexGrow: 1,
+    maxWidth: 460,
   },
 });

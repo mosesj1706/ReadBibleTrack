@@ -216,7 +216,7 @@ const styles = StyleSheet.create({
     paddingTop: Spacing.three,
     flexWrap: 'wrap',
   },
-  crumb: { minHeight: 32, justifyContent: 'center' },
+  crumb: { minHeight: 44, justifyContent: 'center' },
   scroll: { paddingHorizontal: Spacing.two, paddingBottom: Spacing.four, gap: Spacing.two },
   group: { gap: Spacing.half },
   eyebrow: {
@@ -226,15 +226,18 @@ const styles = StyleSheet.create({
     paddingTop: Spacing.two,
   },
   bookRow: {
-    minHeight: 38,
+    // 44 is the smallest a finger reliably hits. A list of 66 books is
+    // exactly where it is tempting to shave a few points off each row, and
+    // exactly where the misses accumulate.
+    minHeight: 44,
     justifyContent: 'center',
     paddingHorizontal: Spacing.two,
     borderRadius: Radius.small,
   },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.one, paddingHorizontal: Spacing.one },
   tile: {
-    minWidth: 42,
-    minHeight: 42,
+    minWidth: 44,
+    minHeight: 44,
     paddingHorizontal: Spacing.one,
     borderRadius: Radius.small,
     borderWidth: StyleSheet.hairlineWidth,

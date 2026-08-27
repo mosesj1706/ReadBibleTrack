@@ -15,6 +15,7 @@ import {
   StyleSheet,
   TextInput,
   View,
+  useWindowDimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -22,7 +23,7 @@ import { canonSpan, normaliseRanges, type VerseRange } from '@/bible/verse-id.ts
 import { TOTAL_VERSES, countVerses, progressThrough } from '@/bible/versification.ts';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Fonts, MaxContentWidth, Spacing } from '@/constants/theme';
+import { Fonts, MaxPageWidth, Spacing, WideBreakpoint } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useAuth } from '@/auth/provider';
 import {
@@ -46,6 +47,8 @@ function leave(): void {
 
 export default function CircleScreen() {
   const theme = useTheme();
+  const { width } = useWindowDimensions();
+  const wide = width >= WideBreakpoint;
   const { session } = useAuth();
   const me = session?.user.id;
 
@@ -264,9 +267,11 @@ export default function CircleScreen() {
                 well on your own.
               </ThemedText>
 
+              <View style={wide ? styles.choices : undefined}>
               <View
                 style={[
                   styles.card,
+                  wide ? styles.choice : undefined,
                   { backgroundColor: theme.backgroundElement, borderColor: theme.border },
                 ]}
               >
@@ -338,6 +343,7 @@ export default function CircleScreen() {
               <View
                 style={[
                   styles.card,
+                  wide ? styles.choice : undefined,
                   { backgroundColor: theme.backgroundElement, borderColor: theme.border },
                 ]}
               >
@@ -380,6 +386,7 @@ export default function CircleScreen() {
                   )}
                 </Pressable>
               </View>
+              </View>
             </>
           )}
 
@@ -398,13 +405,18 @@ export default function CircleScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, flexDirection: 'row', justifyContent: 'center' },
-  container: { flex: 1, width: '100%', maxWidth: MaxContentWidth },
+  container: { flex: 1, width: '100%', maxWidth: MaxPageWidth },
   middle: { alignItems: 'center', justifyContent: 'center' },
   topBar: { paddingHorizontal: Spacing.three, paddingBottom: Spacing.two },
   leaveBtn: { minHeight: 44, justifyContent: 'center' },
   scroll: { paddingHorizontal: Spacing.four, paddingBottom: Spacing.six, gap: Spacing.three },
   title: { fontSize: 34, lineHeight: 40, fontWeight: '400' },
   eyebrow: { textTransform: 'uppercase', letterSpacing: 1.2 },
+  // Starting a circle and joining one are the same decision seen from two
+  // sides, so on a display they sit beside each other rather than one under
+  // the other with the room to the right left empty.
+  choices: { flexDirection: 'row', gap: Spacing.three, alignItems: 'flex-start' },
+  choice: { flex: 1 },
   card: {
     borderWidth: StyleSheet.hairlineWidth,
     borderRadius: Spacing.two,

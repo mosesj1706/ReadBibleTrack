@@ -14,7 +14,7 @@ import { formatReference } from '@/bible/reference.ts';
 import type { VerseRange } from '@/bible/verse-id.ts';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Fonts, MaxContentWidth, Spacing } from '@/constants/theme';
+import { Fonts, MaxPageWidth, Spacing } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useTheme } from '@/hooks/use-theme';
 import { MARK_TINTS, useMarks } from '@/marks/provider';
@@ -108,6 +108,7 @@ export default function MarkedScreen() {
             </View>
           ) : null}
 
+          <View style={styles.entries}>
           {tab === 'notes'
             ? notes.map((note) => (
                 <View
@@ -170,6 +171,7 @@ export default function MarkedScreen() {
                   </Pressable>
                 </View>
               ))}
+          </View>
         </ScrollView>
       </SafeAreaView>
     </ThemedView>
@@ -178,7 +180,7 @@ export default function MarkedScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, flexDirection: 'row', justifyContent: 'center' },
-  container: { flex: 1, width: '100%', maxWidth: MaxContentWidth },
+  container: { flex: 1, width: '100%', maxWidth: MaxPageWidth },
   topBar: { paddingHorizontal: Spacing.three, paddingBottom: Spacing.two },
   leave: { minHeight: 44, justifyContent: 'center' },
   scroll: { paddingHorizontal: Spacing.four, paddingBottom: Spacing.six, gap: Spacing.two },
@@ -191,7 +193,14 @@ const styles = StyleSheet.create({
     minHeight: 44,
     justifyContent: 'center',
   },
+  // Marked verses are scanned rather than read straight through, so they sit
+  // two or three abreast where there is room instead of stretching one card
+  // across a whole desktop display.
+  entries: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two },
   entry: {
+    flexBasis: 340,
+    flexGrow: 1,
+    maxWidth: 480,
     borderWidth: StyleSheet.hairlineWidth,
     borderRadius: Spacing.two,
     padding: Spacing.three,
