@@ -329,6 +329,14 @@ function Step({
   );
 }
 
+/**
+ * The reader at its widest: two 248pt panels either side of the reading
+ * measure, plus the gaps and padding between them. The top bar is held to the
+ * same width so its controls sit over the columns rather than out at the far
+ * corners of a large display.
+ */
+const ReaderWidth = 248 * 2 + MaxContentWidth + Spacing.three * 4;
+
 const styles = StyleSheet.create({
   screen: { flex: 1, flexDirection: 'row', justifyContent: 'center' },
   container: { flex: 1, width: '100%', maxWidth: MaxContentWidth },
@@ -343,6 +351,13 @@ const styles = StyleSheet.create({
     alignItems: 'stretch',
     gap: Spacing.three,
     paddingHorizontal: Spacing.three,
+    // Without this the middle column stops at the reading measure and every
+    // remaining point of a wide display piles up on the right, leaving the
+    // three panes shoved against the left edge.
+    justifyContent: 'center',
+    width: '100%',
+    maxWidth: ReaderWidth,
+    alignSelf: 'center',
   },
   // Wide enough for a book name and a grid of chapter numbers, narrow enough
   // that the reading measure keeps the middle.
@@ -384,6 +399,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.three,
     paddingBottom: Spacing.two,
     gap: Spacing.two,
+    width: '100%',
+    maxWidth: ReaderWidth,
+    alignSelf: 'center',
     // On a phone too narrow for one row — a 320pt screen with three
     // translations — the chips drop to a second line rather than pushing the
     // panel toggles off the edge, where they were unreachable.
