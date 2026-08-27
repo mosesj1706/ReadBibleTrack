@@ -16,13 +16,23 @@ import { after, before, describe, test } from 'node:test';
 
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
-const status = JSON.parse(
-  execFileSync('npx', ['supabase', 'status', '-o', 'json'], { encoding: 'utf8' }),
-) as Record<string, string>;
+/**
+ * Local by default, but any project when the environment says so — the same
+ * suite has to be able to prove a hosted database before anything ships to it.
+ * The service key is read from the environment and never written to disk.
+ */
+function credentials(): { api: string; anon: string; service: string } {
+  const { SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY } = process.env;
+  if (SUPABASE_URL && SUPABASE_ANON_KEY && SUPABASE_SERVICE_ROLE_KEY) {
+    return { api: SUPABASE_URL, anon: SUPABASE_ANON_KEY, service: SUPABASE_SERVICE_ROLE_KEY };
+  }
+  const local = JSON.parse(
+    execFileSync('npx', ['supabase', 'status', '-o', 'json'], { encoding: 'utf8' }),
+  ) as Record<string, string>;
+  return { api: local.API_URL, anon: local.ANON_KEY, service: local.SERVICE_ROLE_KEY };
+}
 
-const API = status.API_URL;
-const ANON = status.ANON_KEY;
-const SERVICE = status.SERVICE_ROLE_KEY;
+const { api: API, anon: ANON, service: SERVICE } = credentials();
 
 const admin = createClient(API, SERVICE, { auth: { persistSession: false } });
 

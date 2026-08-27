@@ -243,10 +243,24 @@ literally, `read/[reference].html`. A request for `/read/John 14` has to be
 pointed at it, and the client reads the reference back out of the URL. A
 CloudFront function does that; S3 alone cannot.
 
-The deploy script refuses to run while `EXPO_PUBLIC_SUPABASE_URL` points at
-localhost. Those values are baked into the bundle at build time, so shipping one
-built against this machine gives every visitor a sign-in screen that cannot
-reach anything, with nothing but a console error to explain it.
+### Why the deploy script is so suspicious of itself
+
+`EXPO_PUBLIC_*` values are baked into the bundle when it is built, so a build
+made against the wrong backend produces a site where every visitor gets a
+sign-in screen that reaches nothing — and a console error is the only clue.
+Three separate things conspire to cause that, and the script defends against
+each:
+
+- `.env.local` points at the local stack, so development cannot write to the
+  real database. It is moved aside for the build and restored afterwards,
+  because **Expo loads it itself and it overrides exported shell variables** —
+  exporting the production values is not enough on its own.
+- The export runs with `--clear`. Expo inlines those values at transform time
+  and **Metro caches the transformed module**, so changing the backend does not
+  invalidate anything and the build silently keeps whatever it saw first.
+- The built bundle is then **grepped for the hosted host** and refuses to
+  upload without it. Both of the above were found that way: every check passed
+  while the bundle still said `127.0.0.1`.
 
 ## Status
 
