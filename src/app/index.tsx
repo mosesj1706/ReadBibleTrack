@@ -6,7 +6,7 @@ import { portionFor, resumeAt } from '@/bible/plan.ts';
 import { formatReference } from '@/bible/reference.ts';
 import { canonSpan, subtractRanges } from '@/bible/verse-id.ts';
 import { countVerses, progressThrough } from '@/bible/versification.ts';
-import { Card, Ground } from '@/components/surfaces';
+import { Card, Glass, Ground } from '@/components/surfaces';
 import { Animated, Rise, useFill } from '@/components/motion';
 import { ScriptureText } from '@/components/scripture-text';
 import { ThemedText } from '@/components/themed-text';
@@ -90,7 +90,10 @@ export default function TodayScreen() {
           <Rise>
           <Link href="/plan" asChild>
             <Pressable accessibilityRole="link" style={styles.press}>
-              <Card style={styles.planRow}>
+              {/* Frosted rather than solid: which plan is running is a setting
+                  you glance at, so it should read as chrome over the ground
+                  and not compete with the passage card below it. */}
+              <Glass style={styles.planRow}>
               <View style={styles.planText}>
                 <ThemedText type="small" themeColor="textFaint" style={styles.eyebrow}>
                   Plan
@@ -100,7 +103,7 @@ export default function TodayScreen() {
               <ThemedText type="small" themeColor="accent">
                 {planned ? `Day ${day}` : 'Choose'} ›
               </ThemedText>
-              </Card>
+              </Glass>
             </Pressable>
           </Link>
           </Rise>

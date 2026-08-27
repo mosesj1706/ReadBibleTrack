@@ -10,7 +10,17 @@ import type { ScriptureNote, ScriptureVerse } from '@/scripture/queries';
 /** Poetry is indented by its USFM marker; anything else reads as prose. */
 const INDENT: Record<string, number> = { q1: Spacing.three, q2: Spacing.five };
 
-type Piece = { readonly text: string; readonly spoken: boolean; readonly noteAt?: number };
+/**
+ * `noteAts` is a list because two footnotes can hang at the same character.
+ * KJV Genesis 2:23 has exactly that — one note on "Woman", one on "Man", both
+ * anchored at offset 128 — and taking only the first left the second with a
+ * number in the footnote list and nothing in the text pointing at it.
+ */
+type Piece = {
+  readonly text: string;
+  readonly spoken: boolean;
+  readonly noteAts: readonly number[];
+};
 
 /**
  * Cut a verse into runs of text at every point something changes: where Jesus
@@ -28,22 +38,23 @@ function cut(verse: ScriptureVerse, noteMarks: readonly number[]): Piece[] {
   const ordered = [...boundaries].sort((a, b) => a - b);
   const spokenAt = (index: number) =>
     verse.redLetter.some(([start, end]) => index >= start && index < end);
+  const notesAt = (offset: number) =>
+    noteMarks.flatMap((mark, index) => (mark === offset ? [index] : []));
 
   const pieces: Piece[] = [];
   for (let i = 0; i < ordered.length - 1; i++) {
     const from = ordered[i];
     const to = ordered[i + 1];
-    const noteAt = noteMarks.indexOf(from);
     pieces.push({
       text: verse.text.slice(from, to),
       spoken: spokenAt(from),
-      noteAt: noteAt >= 0 ? noteAt : undefined,
+      noteAts: notesAt(from),
     });
   }
 
-  // A note sitting at the very end of the verse has no run to lead.
-  const trailing = noteMarks.indexOf(verse.text.length);
-  if (trailing >= 0) pieces.push({ text: '', spoken: false, noteAt: trailing });
+  // Notes sitting at the very end of the verse have no run to lead.
+  const trailing = notesAt(verse.text.length);
+  if (trailing.length > 0) pieces.push({ text: '', spoken: false, noteAts: trailing });
   return pieces;
 }
 
@@ -113,11 +124,11 @@ function Verse({
         ) : (
           pieces.map((piece, index) => (
             <Fragment key={index}>
-              {piece.noteAt !== undefined ? (
-                <Text style={[styles.marker, { color: theme.accent }]}>
-                  {String(firstNote + piece.noteAt + 1)}
+              {piece.noteAts.map((at) => (
+                <Text key={at} style={[styles.marker, { color: theme.accent }]}>
+                  {String(firstNote + at + 1)}
                 </Text>
-              ) : null}
+              ))}
               <Text style={piece.spoken ? { color: theme.redLetter } : undefined}>
                 {piece.text}
               </Text>
@@ -189,7 +200,11 @@ export function ScriptureText({
       {notes.length > 0 ? (
         <View style={[styles.notes, { borderTopColor: theme.border }]}>
           {notes.map((note, index) => (
-            <ThemedText key={`${note.verseId}-${note.position}`} type="small" themeColor="textFaint">
+            <ThemedText
+              key={`${note.verseId}-${note.position}-${index}`}
+              type="small"
+              themeColor="textFaint"
+            >
               <Text style={{ color: theme.accent }}>{index + 1} </Text>
               {note.text}
             </ThemedText>

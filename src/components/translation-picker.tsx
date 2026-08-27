@@ -1,4 +1,4 @@
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, View, type ViewStyle } from 'react-native';
 
 import { TRANSLATIONS } from '@/bible/translations.ts';
 import { ThemedText } from '@/components/themed-text';
@@ -28,9 +28,15 @@ export function TranslationPicker() {
             style={[
               styles.chip,
               {
-                backgroundColor: selected ? theme.accentSoft : theme.backgroundElement,
-                borderColor: selected ? theme.accent : theme.border,
+                // Frosted when it is one of the choices, solid when it is the
+                // choice: the selected chip should read as pressed into the
+                // bar rather than floating above it like the others.
+                backgroundColor: selected ? theme.accentSoft : theme.glass,
+                borderColor: selected ? theme.accent : theme.glassBorder,
               },
+              Platform.OS === 'web' && !selected
+                ? ({ backdropFilter: 'blur(12px) saturate(140%)' } as ViewStyle)
+                : null,
             ]}
           >
             <ThemedText type="small" themeColor={selected ? 'accent' : 'textSecondary'}>

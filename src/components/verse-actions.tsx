@@ -12,6 +12,7 @@ import { Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { readUpTo } from '@/bible/plan.ts';
 import { formatReference } from '@/bible/reference.ts';
 import type { VerseId, VerseRange } from '@/bible/verse-id.ts';
+import { Glass } from '@/components/surfaces';
 import { ThemedText } from '@/components/themed-text';
 import { Fonts, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -42,12 +43,7 @@ export function VerseActions({
   const toHere = readUpTo(verseId, bookmark);
 
   return (
-    <View
-      style={[
-        styles.sheet,
-        { backgroundColor: theme.backgroundElement, borderColor: theme.border },
-      ]}
-    >
+    <Glass floating style={styles.sheet}>
       <View style={styles.headerRow}>
         <ThemedText type="smallBold" style={{ fontFamily: Fonts.serif }}>
           {formatReference(range)}
@@ -148,7 +144,7 @@ export function VerseActions({
           Read to here — {formatReference(toHere)}
         </ThemedText>
       </Pressable>
-    </View>
+    </Glass>
   );
 }
 
@@ -183,13 +179,9 @@ function Action({
 }
 
 const styles = StyleSheet.create({
-  sheet: {
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: Spacing.two,
-    padding: Spacing.three,
-    gap: Spacing.two,
-  },
+  // Glass brings the border, the radius and the elevation; this is the room
+  // inside it.
+  sheet: { padding: Spacing.three, gap: Spacing.two },
   headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   close: { minHeight: 44, justifyContent: 'center', paddingLeft: Spacing.three },
   swatches: { flexDirection: 'row', gap: Spacing.two, flexWrap: 'wrap' },

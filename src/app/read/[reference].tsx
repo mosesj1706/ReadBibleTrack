@@ -154,7 +154,7 @@ export default function ReaderScreen() {
     <Ground>
       <Stack.Screen options={{ title }} />
       <SafeAreaView style={styles.frame}>
-        <View style={styles.topBar}>
+        <Glass style={styles.topBar}>
           <Pressable
             onPress={leave}
             accessibilityRole="button"
@@ -176,7 +176,7 @@ export default function ReaderScreen() {
                 onPress={() => setDrawer((d) => (d === 'marks' ? 'none' : 'marks'))} />
             </View>
           ) : null}
-        </View>
+        </Glass>
 
         <View style={styles.columns}>
         {wide ? <Glass style={styles.side}>{palette}</Glass> : null}
@@ -397,11 +397,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: Spacing.three,
-    paddingBottom: Spacing.two,
+    paddingVertical: Spacing.two,
     gap: Spacing.two,
     width: '100%',
-    maxWidth: ReaderWidth,
+    // Glass draws a rounded panel, so the bar needs to sit in from the edges
+    // rather than run flush to them.
+    maxWidth: ReaderWidth - Spacing.three * 2,
     alignSelf: 'center',
+    marginBottom: Spacing.two,
     // On a phone too narrow for one row — a 320pt screen with three
     // translations — the chips drop to a second line rather than pushing the
     // panel toggles off the edge, where they were unreachable.
