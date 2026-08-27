@@ -21,6 +21,7 @@ import {
   fromVerseId,
   toVerseId,
 } from './verse-id.ts';
+import { lastVerse } from './versification.ts';
 
 const REFERENCE = new RegExp(
   [
@@ -126,8 +127,12 @@ export function formatReference(range: VerseRange, options: FormatOptions = {}):
     return `${name} ${from.chapter}:${from.verse} - ${tail} ${to.chapter}:${to.verse}`;
   }
 
+  // A range ends a chapter either by running to the open upper bound that
+  // `chapterSpan` builds, or by reaching the chapter's real last verse. Both
+  // mean "all of it", and both should read as "John 3" rather than "John 3:1-36".
+  const chapterEnd = lastVerse(to.book, to.chapter);
   const wholeStart = from.verse === 1;
-  const wholeEnd = to.verse >= MAX_VERSE;
+  const wholeEnd = to.verse >= MAX_VERSE || (chapterEnd > 0 && to.verse >= chapterEnd);
 
   // Whole book: "Jude", "Genesis".
   if (wholeStart && wholeEnd && from.chapter === 1 && to.chapter === startBook.chapters) {

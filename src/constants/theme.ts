@@ -18,6 +18,8 @@ export const Colors = {
     border: '#D8DAD2',
     accent: '#2F6B58',
     accentSoft: '#DCE7E1',
+    /** Words of Jesus, where a translation marks them. */
+    redLetter: '#9C2B2B',
   },
   dark: {
     background: '#14181C',
@@ -29,6 +31,7 @@ export const Colors = {
     border: '#2C333A',
     accent: '#6FBFA0',
     accentSoft: '#1E2E28',
+    redLetter: '#E08A84',
   },
 } as const;
 

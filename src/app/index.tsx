@@ -1,36 +1,44 @@
-import { StyleSheet, View } from 'react-native';
+import { Link } from 'expo-router';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { formatReference, parseReference } from '@/bible/reference.ts';
-import { normaliseRanges, subtractRanges } from '@/bible/verse-id.ts';
+import { portionFor, resumeAt } from '@/bible/plan.ts';
+import { formatReference } from '@/bible/reference.ts';
+import { canonSpan, subtractRanges } from '@/bible/verse-id.ts';
+import { countVerses, progressThrough } from '@/bible/versification.ts';
+import { ScriptureText } from '@/components/scripture-text';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Fonts, MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-
-/**
- * A stand-in until the plan engine arrives in phase 2. It exists so this screen
- * exercises the real reference and range code rather than hard-coded strings.
- */
-const SAMPLE_DAY = ['John 1', 'Psalm 1', 'Proverbs 1:1-7'];
-
-function todaysReading() {
-  const ranges = normaliseRanges(
-    SAMPLE_DAY.map(parseReference).filter((r) => r !== undefined),
-  );
-  return {
-    ranges,
-    label: ranges.map((r) => formatReference(r)).join(' · '),
-  };
-}
+import { usePlan } from '@/plans/provider';
+import { useProgress } from '@/progress/provider';
+import { usePassage } from '@/scripture/provider';
 
 export default function TodayScreen() {
   const theme = useTheme();
-  const { ranges, label } = todaysReading();
+  const { plan, day } = usePlan();
+  const { ranges: read, bookmark } = useProgress();
 
-  // Nothing is logged yet, so everything in today's reading is still ahead.
-  const remaining = subtractRanges(ranges, []);
-  const done = remaining.length === 0;
+  // What the plan asks for today, in the order the plan lists it — never
+  // sorted, so "Gospel first, then Psalm" survives.
+  const portion = portionFor(plan, day);
+  const planned = portion.length > 0;
+
+  const total = countVerses(portion);
+  const left = countVerses(subtractRanges(portion, read));
+  const done = planned && left === 0;
+  const share = progressThrough(portion, read);
+
+  // With a plan, carry on inside today's portion. Without one, carry on from
+  // wherever reading stopped, anywhere in the canon.
+  const carryOn = planned ? resumeAt(portion, read) : (bookmark ?? resumeAt([canonSpan()], read));
+  const readEverything = countVerses(read);
+
+  const opening = portion[0]
+    ? { start: portion[0].start, end: Math.min(portion[0].start + 3, portion[0].end) }
+    : undefined;
+  const openingVerses = usePassage(opening).verses;
 
   const today = new Date().toLocaleDateString(undefined, {
     weekday: 'long',
@@ -41,30 +49,99 @@ export default function TodayScreen() {
   return (
     <ThemedView style={styles.screen}>
       <SafeAreaView style={styles.container}>
-        <View style={styles.header}>
-          <ThemedText type="small" themeColor="textFaint" style={styles.eyebrow}>
-            {today}
-          </ThemedText>
-          <ThemedText type="title" style={[styles.title, { fontFamily: Fonts.serif }]}>
-            Today&rsquo;s reading
-          </ThemedText>
-        </View>
+        <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+          <View style={styles.header}>
+            <ThemedText type="small" themeColor="textFaint" style={styles.eyebrow}>
+              {today}
+            </ThemedText>
+            <ThemedText type="title" style={[styles.title, { fontFamily: Fonts.serif }]}>
+              {planned ? 'Today’s reading' : 'Keep reading'}
+            </ThemedText>
+          </View>
 
-        <View style={[styles.card, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}>
-          <ThemedText type="subtitle" style={[styles.passage, { fontFamily: Fonts.serif }]}>
-            {label}
-          </ThemedText>
-          <ThemedText type="small" themeColor="textSecondary">
-            {done ? 'Finished for today.' : `${ranges.length} passages, not started.`}
-          </ThemedText>
-        </View>
+          <Link href="/plan" asChild>
+            <Pressable
+              accessibilityRole="link"
+              style={StyleSheet.flatten([
+                styles.planRow,
+                { borderColor: theme.border, backgroundColor: theme.backgroundElement },
+              ])}
+            >
+              <View style={styles.planText}>
+                <ThemedText type="small" themeColor="textFaint" style={styles.eyebrow}>
+                  Plan
+                </ThemedText>
+                <ThemedText type="small">{plan.name}</ThemedText>
+              </View>
+              <ThemedText type="small" themeColor="accent">
+                {planned ? `Day ${day}` : 'Choose'} ›
+              </ThemedText>
+            </Pressable>
+          </Link>
 
-        <View style={[styles.note, { borderLeftColor: theme.accent }]}>
-          <ThemedText type="small" themeColor="textSecondary">
-            Phase 0 groundwork is in place: the canon, verse ids and range algebra.
-            The reader, plans and circles come next.
-          </ThemedText>
-        </View>
+          <View
+            style={[
+              styles.card,
+              { backgroundColor: theme.backgroundElement, borderColor: theme.border },
+            ]}
+          >
+            {planned ? (
+              <>
+                <ThemedText type="subtitle" style={[styles.passage, { fontFamily: Fonts.serif }]}>
+                  {portion.map((range) => formatReference(range)).join(' · ')}
+                </ThemedText>
+                <ThemedText type="small" themeColor="textSecondary">
+                  {done
+                    ? `Finished for today — all ${total} verses.`
+                    : `${total - left} of ${total} verses read${
+                        share > 0 ? ` · ${Math.round(share * 100)}%` : ''
+                      }`}
+                </ThemedText>
+              </>
+            ) : (
+              <>
+                <ThemedText type="subtitle" style={[styles.passage, { fontFamily: Fonts.serif }]}>
+                  {carryOn ? formatReference({ start: carryOn, end: carryOn }) : 'Genesis 1:1'}
+                </ThemedText>
+                <ThemedText type="small" themeColor="textSecondary">
+                  {readEverything > 0
+                    ? `${readEverything.toLocaleString()} verses read so far`
+                    : 'Nothing read yet — start anywhere.'}
+                </ThemedText>
+              </>
+            )}
+          </View>
+
+          {carryOn ? (
+            <Link
+              href={{
+                pathname: '/read/[reference]',
+                params: { reference: formatReference({ start: carryOn, end: carryOn }) },
+              }}
+              asChild
+            >
+              <Pressable
+                accessibilityRole="link"
+                style={StyleSheet.flatten([styles.action, { backgroundColor: theme.accent }])}
+              >
+                <ThemedText type="smallBold" style={{ color: theme.background }}>
+                  {left === total || readEverything === 0 ? 'Start reading' : 'Carry on'}
+                </ThemedText>
+              </Pressable>
+            </Link>
+          ) : null}
+
+          {openingVerses.length > 0 ? (
+            <View
+              style={[
+                styles.card,
+                { backgroundColor: theme.backgroundElement, borderColor: theme.border },
+              ]}
+            >
+              <ScriptureText verses={openingVerses} />
+            </View>
+          ) : null}
+        </ScrollView>
       </SafeAreaView>
     </ThemedView>
   );
@@ -72,16 +149,22 @@ export default function TodayScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, flexDirection: 'row', justifyContent: 'center' },
-  container: {
-    flex: 1,
-    width: '100%',
-    maxWidth: MaxContentWidth,
-    paddingHorizontal: Spacing.four,
-    gap: Spacing.four,
-  },
-  header: { paddingTop: Spacing.six, gap: Spacing.two },
+  container: { flex: 1, width: '100%', maxWidth: MaxContentWidth },
+  scroll: { paddingHorizontal: Spacing.four, paddingBottom: Spacing.six, gap: Spacing.four },
+  header: { paddingTop: Spacing.four, gap: Spacing.two },
   eyebrow: { textTransform: 'uppercase', letterSpacing: 1.2 },
   title: { fontSize: 38, lineHeight: 42, fontWeight: '400' },
+  planRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: Spacing.two,
+    paddingHorizontal: Spacing.three,
+    minHeight: 56,
+    gap: Spacing.two,
+  },
+  planText: { gap: Spacing.half, flexShrink: 1 },
   card: {
     borderWidth: StyleSheet.hairlineWidth,
     borderRadius: Spacing.two,
@@ -89,5 +172,11 @@ const styles = StyleSheet.create({
     gap: Spacing.two,
   },
   passage: { fontSize: 24, lineHeight: 32, fontWeight: '400' },
-  note: { borderLeftWidth: 2, paddingLeft: Spacing.three },
+  action: {
+    paddingVertical: Spacing.three,
+    borderRadius: Spacing.two,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 48,
+  },
 });
