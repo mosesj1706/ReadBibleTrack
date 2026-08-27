@@ -32,6 +32,8 @@ yarn-error.*
 
 # local env files
 .env*.local
+# Backups of an env file are still an env file.
+.env*.bak
 
 # typescript
 *.tsbuildinfo
