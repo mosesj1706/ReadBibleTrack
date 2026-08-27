@@ -228,6 +228,11 @@ aws cloudformation deploy \
 ./scripts/deploy-web.sh <bucket> <distribution-id>
 ```
 
+One more thing the stack has to work around: Expo names its fallback page
+`+not-found.html`, and a plus sign in a path does not survive CloudFront
+forwarding it to S3 — the miss page itself comes back 403. The deploy publishes
+a copy as `404.html` and the rewrite points there.
+
 Two parts of that stack are load-bearing, and the site is broken without
 either:
 

@@ -131,7 +131,10 @@ Resources:
             return request;
           }
 
-          request.uri = '/+not-found.html';
+          // Not "+not-found.html": a plus sign in a path does not survive the
+          // hop from CloudFront to S3 and comes back 403. The deploy script
+          // publishes a copy under this plain name.
+          request.uri = '/404.html';
           return request;
         }
 
@@ -165,10 +168,10 @@ Resources:
         CustomErrorResponses:
           - ErrorCode: 403
             ResponseCode: 404
-            ResponsePagePath: /+not-found.html
+            ResponsePagePath: /404.html
           - ErrorCode: 404
             ResponseCode: 404
-            ResponsePagePath: /+not-found.html
+            ResponsePagePath: /404.html
 
 Outputs:
   BucketName:

@@ -118,6 +118,14 @@ aws s3 sync dist/ "s3://$BUCKET/" --delete \
   --cache-control "public, max-age=0, must-revalidate" \
   --only-show-errors
 
+# Expo names the fallback "+not-found.html", and a plus sign in a path does
+# not survive CloudFront forwarding it to S3 — the miss page itself 403s.
+echo "  · publishing the miss page under a plain name"
+aws s3 cp "s3://$BUCKET/+not-found.html" "s3://$BUCKET/404.html" \
+  --content-type "text/html" \
+  --cache-control "public, max-age=0, must-revalidate" \
+  --metadata-directive REPLACE --only-show-errors
+
 echo "  · invalidating the edge"
 ID="$(aws cloudfront create-invalidation \
   --distribution-id "$DISTRIBUTION" --paths '/*' \
