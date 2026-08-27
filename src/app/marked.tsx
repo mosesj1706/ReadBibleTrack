@@ -199,7 +199,7 @@ const styles = StyleSheet.create({
   // two or three abreast where there is room instead of stretching one card
   // across a whole desktop display.
   entries: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two },
-  entry: { flexBasis: 340, flexGrow: 1, maxWidth: 480 },
+  entry: { flexBasis: 340, flexGrow: 1, flexShrink: 1, minWidth: 0, maxWidth: 480 },
   entryBody: { padding: Spacing.three, gap: Spacing.one },
   markRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three },
   grow: { flexGrow: 1, minHeight: 44, justifyContent: 'center' },

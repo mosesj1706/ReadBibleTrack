@@ -208,6 +208,8 @@ const styles = StyleSheet.create({
     minHeight: 44,
     flexBasis: 300,
     flexGrow: 1,
+    flexShrink: 1,
+    minWidth: 0,
     maxWidth: 460,
   },
   bookName: { width: 132 },

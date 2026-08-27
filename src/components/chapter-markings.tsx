@@ -50,20 +50,21 @@ export function ChapterMarkings({
         ) : null}
 
         {here.map((mark) => (
-          <Pressable
-            key={mark.id}
-            onPress={() => onJump(mark.start)}
-            accessibilityRole="button"
-            style={[styles.row, { borderColor: theme.border }]}
-          >
-            {mark.colour ? (
-              <View style={[styles.chip, { backgroundColor: MARK_TINTS[mark.colour][scheme] }]} />
-            ) : (
-              <ThemedText themeColor="accent">★</ThemedText>
-            )}
-            <ThemedText type="small" style={{ fontFamily: Fonts.serif, flexGrow: 1 }}>
-              {formatReference(mark)}
-            </ThemedText>
+          <View key={mark.id} style={[styles.row, { borderColor: theme.border }]}>
+            <Pressable
+              onPress={() => onJump(mark.start)}
+              accessibilityRole="button"
+              style={styles.rowMain}
+            >
+              {mark.colour ? (
+                <View style={[styles.chip, { backgroundColor: MARK_TINTS[mark.colour][scheme] }]} />
+              ) : (
+                <ThemedText themeColor="accent">★</ThemedText>
+              )}
+              <ThemedText type="small" style={{ fontFamily: Fonts.serif, flexGrow: 1 }}>
+                {formatReference(mark)}
+              </ThemedText>
+            </Pressable>
             <Pressable
               onPress={() => forgetMark(mark.id)}
               accessibilityRole="button"
@@ -74,20 +75,24 @@ export function ChapterMarkings({
                 ×
               </ThemedText>
             </Pressable>
-          </Pressable>
+          </View>
         ))}
 
         {written.map((note) => (
-          <Pressable
-            key={note.id}
-            onPress={() => onJump(note.start)}
-            accessibilityRole="button"
-            style={[styles.note, { borderColor: theme.border }]}
-          >
+          <View key={note.id} style={[styles.note, { borderColor: theme.border }]}>
             <View style={styles.noteHead}>
-              <ThemedText type="smallBold" themeColor="accent" style={{ fontFamily: Fonts.serif }}>
-                {formatReference(note)}
-              </ThemedText>
+              <Pressable
+                onPress={() => onJump(note.start)}
+                accessibilityRole="button"
+                style={styles.noteMain}
+              >
+                <ThemedText type="smallBold" themeColor="accent" style={{ fontFamily: Fonts.serif }}>
+                  {formatReference(note)}
+                </ThemedText>
+                <ThemedText type="small" themeColor="textSecondary">
+                  {note.body}
+                </ThemedText>
+              </Pressable>
               <Pressable
                 onPress={() => forgetNote(note.id)}
                 accessibilityRole="button"
@@ -99,10 +104,7 @@ export function ChapterMarkings({
                 </ThemedText>
               </Pressable>
             </View>
-            <ThemedText type="small" themeColor="textSecondary">
-              {note.body}
-            </ThemedText>
-          </Pressable>
+          </View>
         ))}
       </ScrollView>
     </View>
@@ -134,7 +136,19 @@ const styles = StyleSheet.create({
     borderRadius: Radius.small,
     borderWidth: StyleSheet.hairlineWidth,
   },
-  noteHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  // The jump target and the remove button are siblings, never nested. A
+  // button inside a button is invalid HTML — React reports it as a hydration
+  // error on the web — and leaves the inner one unreachable by keyboard.
+  rowMain: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
+    flexGrow: 1,
+    flexShrink: 1,
+    minHeight: 44,
+  },
+  noteHead: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.two },
+  noteMain: { flexGrow: 1, flexShrink: 1, gap: Spacing.half, minHeight: 44 },
   chip: { width: 16, height: 16, borderRadius: 8 },
   remove: { minWidth: 32, minHeight: 32, alignItems: 'center', justifyContent: 'center' },
 });

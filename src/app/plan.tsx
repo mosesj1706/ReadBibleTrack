@@ -144,7 +144,10 @@ const styles = StyleSheet.create({
   // Grows to share a row, but never past this: without a cap a lone card
   // left over on the last row stretches the whole width and stops looking
   // like one of a set.
-  option: { flexBasis: 320, flexGrow: 1, maxWidth: 460 },
+  // flexShrink because React Native defaults it to 0, unlike CSS: without it
+  // a 320pt basis cannot shrink into the ~272pt a 320pt phone actually has,
+  // and the card is clipped off the right edge instead of narrowing.
+  option: { flexBasis: 320, flexGrow: 1, flexShrink: 1, minWidth: 0, maxWidth: 460 },
   fill: { flex: 1 },
   optionBody: { flex: 1, padding: Spacing.three, gap: Spacing.half, minHeight: 44 },
 });
