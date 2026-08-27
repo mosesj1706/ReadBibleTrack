@@ -1,0 +1,179 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  Static hosting for ReadBibleTrack: a private S3 bucket behind CloudFront.
+
+  Two things here are not boilerplate and the site does not work without them.
+
+  1. The response headers policy sets Cross-Origin-Embedder-Policy and
+     Cross-Origin-Opener-Policy. SQLite runs as WebAssembly in the browser and
+     stores the bundled translation in OPFS, which needs SharedArrayBuffer,
+     which browsers only grant to a cross-origin-isolated page. Without these
+     two headers signing in works and opening a chapter shows nothing.
+
+  2. The viewer-request function rewrites clean URLs onto the files Expo
+     actually exports. Every chapter is one prerendered file literally named
+     "[reference].html", so /read/John 14 has to be pointed at it; the client
+     reads the reference back out of the URL.
+
+Parameters:
+  BucketName:
+    Type: String
+    Description: Globally unique S3 bucket name, e.g. readbibletrack-web.
+
+Resources:
+  SiteBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Ref BucketName
+      # Nothing is public. CloudFront reaches the bucket through the origin
+      # access control below, and only CloudFront can.
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+
+  OriginAccessControl:
+    Type: AWS::CloudFront::OriginAccessControl
+    Properties:
+      OriginAccessControlConfig:
+        Name: !Sub '${BucketName}-oac'
+        OriginAccessControlOriginType: s3
+        SigningBehavior: always
+        SigningProtocol: sigv4
+
+  SiteBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref SiteBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: cloudfront.amazonaws.com
+            Action: s3:GetObject
+            Resource: !Sub '${SiteBucket.Arn}/*'
+            Condition:
+              StringEquals:
+                AWS:SourceArn: !Sub 'arn:aws:cloudfront::${AWS::AccountId}:distribution/${Distribution}'
+
+  IsolationHeaders:
+    Type: AWS::CloudFront::ResponseHeadersPolicy
+    Properties:
+      ResponseHeadersPolicyConfig:
+        Name: !Sub '${BucketName}-isolation'
+        Comment: Cross-origin isolation, required for SQLite-WASM in the browser.
+        CustomHeadersConfig:
+          Items:
+            - Header: Cross-Origin-Embedder-Policy
+              Value: credentialless
+              Override: true
+            - Header: Cross-Origin-Opener-Policy
+              Value: same-origin
+              Override: true
+        SecurityHeadersConfig:
+          ContentTypeOptions:
+            Override: true
+          FrameOptions:
+            FrameOption: DENY
+            Override: true
+          ReferrerPolicy:
+            ReferrerPolicy: strict-origin-when-cross-origin
+            Override: true
+          StrictTransportSecurity:
+            AccessControlMaxAgeSec: 31536000
+            IncludeSubdomains: true
+            Override: true
+
+  RewriteFunction:
+    Type: AWS::CloudFront::Function
+    Properties:
+      Name: !Sub '${BucketName}-rewrite'
+      AutoPublish: true
+      FunctionConfig:
+        Comment: Map clean URLs onto the files Expo exports.
+        Runtime: cloudfront-js-2.0
+      FunctionCode: |
+        function handler(event) {
+          var request = event.request;
+          var uri = request.uri;
+
+          // Anything with a file extension is a real asset: js, wasm, db, ico.
+          var last = uri.substring(uri.lastIndexOf('/') + 1);
+          if (last.indexOf('.') !== -1) {
+            return request;
+          }
+
+          if (uri === '/' || uri === '') {
+            request.uri = '/index.html';
+            return request;
+          }
+
+          // Every chapter is one prerendered file. The reference stays in the
+          // URL and the client reads it from there.
+          if (uri.indexOf('/read/') === 0) {
+            request.uri = '/read/[reference].html';
+            return request;
+          }
+
+          var trimmed = uri.charAt(uri.length - 1) === '/'
+            ? uri.substring(0, uri.length - 1)
+            : uri;
+
+          var known = ['/plan', '/circle', '/marked', '/progress', '/_sitemap'];
+          if (known.indexOf(trimmed) !== -1) {
+            request.uri = trimmed + '.html';
+            return request;
+          }
+
+          request.uri = '/+not-found.html';
+          return request;
+        }
+
+  Distribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        Comment: ReadBibleTrack
+        DefaultRootObject: index.html
+        HttpVersion: http2and3
+        PriceClass: PriceClass_100
+        Origins:
+          - Id: s3
+            DomainName: !GetAtt SiteBucket.RegionalDomainName
+            OriginAccessControlId: !GetAtt OriginAccessControl.Id
+            S3OriginConfig: {}
+        DefaultCacheBehavior:
+          TargetOriginId: s3
+          ViewerProtocolPolicy: redirect-to-https
+          AllowedMethods: [GET, HEAD, OPTIONS]
+          CachedMethods: [GET, HEAD, OPTIONS]
+          Compress: true
+          # Managed-CachingOptimized: honours the Cache-Control the deploy
+          # script sets, and compresses on the fly.
+          CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6
+          ResponseHeadersPolicyId: !Ref IsolationHeaders
+          FunctionAssociations:
+            - EventType: viewer-request
+              FunctionARN: !GetAtt RewriteFunction.FunctionMetadata.FunctionARN
+        CustomErrorResponses:
+          - ErrorCode: 403
+            ResponseCode: 404
+            ResponsePagePath: /+not-found.html
+          - ErrorCode: 404
+            ResponseCode: 404
+            ResponsePagePath: /+not-found.html
+
+Outputs:
+  BucketName:
+    Value: !Ref SiteBucket
+  DistributionId:
+    Value: !Ref Distribution
+  SiteUrl:
+    Value: !Sub 'https://${Distribution.DomainName}'

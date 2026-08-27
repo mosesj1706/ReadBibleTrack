@@ -215,6 +215,39 @@ So the session lookup races a five second timer. Reading needs no network at
 all — bundled scripture, local progress — and waiting on one is the wrong
 default.
 
+## Hosting the web build
+
+The whole thing is static, so there is no server to run:
+
+```sh
+aws cloudformation deploy \
+  --template-file infra/web-hosting.yaml \
+  --stack-name readbibletrack-web \
+  --parameter-overrides BucketName=<globally-unique-name>
+
+./scripts/deploy-web.sh <bucket> <distribution-id>
+```
+
+Two parts of that stack are load-bearing, and the site is broken without
+either:
+
+**Cross-origin isolation.** SQLite runs as WebAssembly and keeps the bundled
+translation in OPFS, which needs `SharedArrayBuffer`, which browsers grant only
+to a cross-origin-isolated page. The response headers policy sets
+`Cross-Origin-Embedder-Policy` and `Cross-Origin-Opener-Policy` on every
+response. Without them signing in works and opening a chapter shows nothing —
+which rules out any host that cannot set custom headers, GitHub Pages included.
+
+**URL rewriting.** Expo exports every chapter as one prerendered file named,
+literally, `read/[reference].html`. A request for `/read/John 14` has to be
+pointed at it, and the client reads the reference back out of the URL. A
+CloudFront function does that; S3 alone cannot.
+
+The deploy script refuses to run while `EXPO_PUBLIC_SUPABASE_URL` points at
+localhost. Those values are baked into the bundle at build time, so shipping one
+built against this machine gives every visitor a sign-in screen that cannot
+reach anything, with nothing but a console error to explain it.
+
 ## Status
 
 Phase 2. The loop closes: open today's reading, read it in whichever of three
