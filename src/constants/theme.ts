@@ -54,25 +54,36 @@ export const Colors = {
     /** Elevation, as a shadow colour the platform can tint. */
     shadow: '#1B2838',
   },
+  /**
+   * Night.
+   *
+   * Warm rather than blue. The old dark theme was a cold blue-grey, which is
+   * the default every app reaches for and the wrong one for this app: blue
+   * light late in the evening is the part of the spectrum that keeps people
+   * awake, and this is something people read in bed. Everything here sits on
+   * the warm side of neutral — the reading page most of all, which is a dim
+   * ember rather than a slab of slate, and takes ink that reads like warm
+   * paper inverted rather than white on black.
+   */
   dark: {
-    background: '#0D131E',
-    backgroundTint: '#141A28',
-    backgroundWarm: '#1B1622',
-    glass: 'rgba(30,38,50,0.80)',
-    glassSolid: 'rgba(20,26,36,0.97)',
-    glassBorder: 'rgba(255,255,255,0.10)',
-    backgroundElement: '#1A222D',
-    backgroundSelected: '#242E3B',
-    page: '#151A21',
+    background: '#14110F',
+    backgroundTint: '#191512',
+    backgroundWarm: '#211A16',
+    glass: 'rgba(38,32,27,0.82)',
+    glassSolid: 'rgba(28,24,20,0.97)',
+    glassBorder: 'rgba(255,236,214,0.10)',
+    backgroundElement: '#221D19',
+    backgroundSelected: '#2E271F',
+    page: '#1B1713',
 
-    text: '#E6EAF0',
-    textSecondary: '#9AA7B8',
-    textFaint: '#6B7889',
-    border: '#2B3644',
+    text: '#EFE7DA',
+    textSecondary: '#B5A796',
+    textFaint: '#7E7264',
+    border: '#342C24',
 
-    accent: '#6FBFA0',
-    accentSoft: '#1E332B',
-    redLetter: '#E08A84',
+    accent: '#7FCCA8',
+    accentSoft: '#1F2E26',
+    redLetter: '#E89A8C',
 
     shadow: '#000000',
   },
@@ -104,15 +115,15 @@ export const SectionColors = {
     revelation: '#9C2B2B',
   },
   dark: {
-    law: '#D9A45E',
-    history: '#D08C72',
-    wisdom: '#A98CD8',
-    majorProphets: '#7EA9DC',
-    minorProphets: '#6FC0B0',
-    gospels: '#6FBFA0',
-    acts: '#AEBF6A',
-    letters: '#93A6C4',
-    revelation: '#E08A84',
+    law: '#E0AC63',
+    history: '#DC9376',
+    wisdom: '#B394E0',
+    majorProphets: '#87B0E2',
+    minorProphets: '#74C8B6',
+    gospels: '#7FCCA8',
+    acts: '#BAC670',
+    letters: '#9DADCB',
+    revelation: '#E89A8C',
   },
 } as const;
 

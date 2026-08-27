@@ -96,8 +96,8 @@ export default function TodayScreen() {
             </ThemedText>
           </View>
 
-          <View style={split ? styles.split : undefined}>
-          <View style={wide ? [styles.column, split ? undefined : styles.solo] : undefined}>
+          <View style={split ? styles.split : styles.stack}>
+          <View style={wide ? [styles.column, split ? undefined : styles.solo] : styles.stack}>
           <Rise>
           <Link href="/plan" asChild>
             <Pressable accessibilityRole="link" style={styles.press}>
@@ -175,7 +175,7 @@ export default function TodayScreen() {
           </View>
 
           {openingVerses.length > 0 ? (
-          <View style={wide ? styles.column : undefined}>
+          <View style={wide ? styles.column : styles.stack}>
           <Rise delay={180}>
             <Card style={styles.card}>
               <ScriptureText verses={openingVerses} />
@@ -201,6 +201,10 @@ const styles = StyleSheet.create({
   // Two columns on a display, one on a phone. The reading measure still caps
   // the column that holds the passage itself.
   split: { flexDirection: 'row', gap: Spacing.five, alignItems: 'flex-start' },
+  // The blocks live inside these wrappers, so the gap has to be on the wrapper
+  // — the scroll view's own gap only ever separated the heading from the group
+  // as a whole, which is why they still touched each other on a phone.
+  stack: { gap: Spacing.five },
   column: { flex: 1, gap: Spacing.five, maxWidth: MaxContentWidth },
   // When there is only one column, it and the heading above it centre
   // together rather than sitting against the left edge of a display neither

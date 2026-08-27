@@ -53,6 +53,7 @@ export function Ground({
   readonly scroll?: SharedValue<number>;
 }) {
   const theme = useTheme();
+  const scheme = useColorScheme();
   const reduced = useReducedMotion();
   // A stand-in so the hooks below are called the same number of times whether
   // or not a caller passed a scroll offset.
@@ -79,7 +80,15 @@ export function Ground({
         />
         {tint ? (
           <LinearGradient
-            colors={[`${tint}2E`, `${tint}12`, 'transparent']}
+            // Weaker at night. The same alpha behaves quite differently on the
+            // two grounds: a pale hue laid over a dark one lifts it far more
+            // than over a light one, and at 18% the whole screen took on the
+            // colour instead of being touched by it.
+            colors={
+              scheme === 'dark'
+                ? [`${tint}1A`, `${tint}0A`, 'transparent']
+                : [`${tint}2E`, `${tint}12`, 'transparent']
+            }
             locations={[0, 0.45, 1]}
             start={{ x: 0.5, y: 0 }}
             end={{ x: 0.5, y: 1 }}
