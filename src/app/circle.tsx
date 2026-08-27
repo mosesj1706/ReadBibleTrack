@@ -21,8 +21,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { canonSpan, normaliseRanges, type VerseRange } from '@/bible/verse-id.ts';
 import { TOTAL_VERSES, countVerses, progressThrough } from '@/bible/versification.ts';
+import { Card, Ground } from '@/components/surfaces';
+import { Rise } from '@/components/motion';
 import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
 import { Fonts, MaxPageWidth, Spacing, WideBreakpoint } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useAuth } from '@/auth/provider';
@@ -109,16 +110,16 @@ export default function CircleScreen() {
 
   if (loading) {
     return (
-      <ThemedView style={styles.screen}>
+      <Ground style={styles.screen}>
         <SafeAreaView style={[styles.container, styles.middle]}>
           <ActivityIndicator color={theme.accent} />
         </SafeAreaView>
-      </ThemedView>
+      </Ground>
     );
   }
 
   return (
-    <ThemedView style={styles.screen}>
+    <Ground style={styles.screen}>
       <SafeAreaView style={styles.container}>
         <View style={styles.topBar}>
           <Pressable onPress={leave} accessibilityRole="button" style={styles.leaveBtn}>
@@ -268,13 +269,8 @@ export default function CircleScreen() {
               </ThemedText>
 
               <View style={wide ? styles.choices : undefined}>
-              <View
-                style={[
-                  styles.card,
-                  wide ? styles.choice : undefined,
-                  { backgroundColor: theme.backgroundElement, borderColor: theme.border },
-                ]}
-              >
+              <Rise style={wide ? styles.choice : undefined}>
+              <Card style={styles.card}>
                 <ThemedText type="small" themeColor="textFaint" style={styles.eyebrow}>
                   Start one
                 </ThemedText>
@@ -338,15 +334,11 @@ export default function CircleScreen() {
                     </ThemedText>
                   )}
                 </Pressable>
-              </View>
+              </Card>
+              </Rise>
 
-              <View
-                style={[
-                  styles.card,
-                  wide ? styles.choice : undefined,
-                  { backgroundColor: theme.backgroundElement, borderColor: theme.border },
-                ]}
-              >
+              <Rise delay={80} style={wide ? styles.choice : undefined}>
+              <Card style={styles.card}>
                 <ThemedText type="small" themeColor="textFaint" style={styles.eyebrow}>
                   Or join one
                 </ThemedText>
@@ -385,7 +377,8 @@ export default function CircleScreen() {
                     </ThemedText>
                   )}
                 </Pressable>
-              </View>
+              </Card>
+              </Rise>
               </View>
             </>
           )}
@@ -399,7 +392,7 @@ export default function CircleScreen() {
           ) : null}
         </ScrollView>
       </SafeAreaView>
-    </ThemedView>
+    </Ground>
   );
 }
 
@@ -417,12 +410,7 @@ const styles = StyleSheet.create({
   // the other with the room to the right left empty.
   choices: { flexDirection: 'row', gap: Spacing.three, alignItems: 'flex-start' },
   choice: { flex: 1 },
-  card: {
-    borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: Spacing.two,
-    padding: Spacing.three,
-    gap: Spacing.two,
-  },
+  card: { padding: Spacing.three, gap: Spacing.two },
   bar: { height: 6, borderRadius: 3, overflow: 'hidden', marginTop: Spacing.one },
   member: {
     flexDirection: 'row',

@@ -12,8 +12,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { planDays, planVerses, portionFor } from '@/bible/plan.ts';
 import { formatReference } from '@/bible/reference.ts';
 import { countVerses } from '@/bible/versification.ts';
+import { Card, Ground } from '@/components/surfaces';
+import { Rise } from '@/components/motion';
 import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
 import { Fonts, MaxPageWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { PLANS } from '@/plans/catalogue';
@@ -29,7 +30,7 @@ export default function PlanScreen() {
   const { plan: current, choose } = usePlan();
 
   return (
-    <ThemedView style={styles.screen}>
+    <Ground style={styles.screen}>
       <SafeAreaView style={styles.container}>
         <View style={styles.topBar}>
           <Pressable
@@ -54,29 +55,30 @@ export default function PlanScreen() {
           </ThemedText>
 
           <View style={styles.list}>
-            {PLANS.map((plan) => {
+            {PLANS.map((plan, index) => {
               const selected = plan.id === current.id;
               const days = planDays(plan);
               const verses = planVerses(plan);
               const first = portionFor(plan, 1);
 
               return (
+                <Rise key={plan.id} delay={index * 40} style={styles.option}>
                 <Pressable
-                  key={plan.id}
                   onPress={() => {
                     choose(plan.id);
                     leave();
                   }}
                   accessibilityRole="button"
                   accessibilityState={{ selected }}
-                  style={[
-                    styles.option,
-                    {
-                      backgroundColor: selected ? theme.accentSoft : theme.backgroundElement,
-                      borderColor: selected ? theme.accent : theme.border,
-                    },
-                  ]}
+                  style={styles.fill}
                 >
+                  <Card
+                    inset={selected}
+                    style={[
+                      styles.optionBody,
+                      selected ? { borderColor: theme.accent } : undefined,
+                    ]}
+                  >
                   <ThemedText
                     type="smallBold"
                     themeColor={selected ? 'accent' : 'text'}
@@ -102,13 +104,15 @@ export default function PlanScreen() {
                       {countVerses(first)} verses)
                     </ThemedText>
                   ) : null}
+                  </Card>
                 </Pressable>
+                </Rise>
               );
             })}
           </View>
         </ScrollView>
       </SafeAreaView>
-    </ThemedView>
+    </Ground>
   );
 }
 
@@ -127,17 +131,10 @@ const styles = StyleSheet.create({
     gap: Spacing.two,
     marginTop: Spacing.two,
   },
-  option: {
-    borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: Spacing.two,
-    padding: Spacing.three,
-    gap: Spacing.half,
-    minHeight: 44,
-    // Grows to share a row, but never past this: without a cap a lone card
-    // left over on the last row stretches the whole width and stops looking
-    // like one of a set.
-    flexBasis: 320,
-    flexGrow: 1,
-    maxWidth: 460,
-  },
+  // Grows to share a row, but never past this: without a cap a lone card
+  // left over on the last row stretches the whole width and stops looking
+  // like one of a set.
+  option: { flexBasis: 320, flexGrow: 1, maxWidth: 460 },
+  fill: { flex: 1 },
+  optionBody: { flex: 1, padding: Spacing.three, gap: Spacing.half, minHeight: 44 },
 });

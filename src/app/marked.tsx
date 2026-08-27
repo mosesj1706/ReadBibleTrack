@@ -12,8 +12,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { formatReference } from '@/bible/reference.ts';
 import type { VerseRange } from '@/bible/verse-id.ts';
+import { Card, Ground } from '@/components/surfaces';
+import { Rise } from '@/components/motion';
 import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
 import { Fonts, MaxPageWidth, Spacing } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useTheme } from '@/hooks/use-theme';
@@ -60,7 +61,7 @@ export default function MarkedScreen() {
   };
 
   return (
-    <ThemedView style={styles.screen}>
+    <Ground style={styles.screen}>
       <SafeAreaView style={styles.container}>
         <View style={styles.topBar}>
           <Pressable onPress={leave} accessibilityRole="button" style={styles.leave}>
@@ -110,14 +111,9 @@ export default function MarkedScreen() {
 
           <View style={styles.entries}>
           {tab === 'notes'
-            ? notes.map((note) => (
-                <View
-                  key={note.id}
-                  style={[
-                    styles.entry,
-                    { backgroundColor: theme.backgroundElement, borderColor: theme.border },
-                  ]}
-                >
+            ? notes.map((note, index) => (
+                <Rise key={note.id} delay={index * 30} style={styles.entry}>
+                <Card style={styles.entryBody}>
                   <Passage range={note}>
                     <Pressable accessibilityRole="link">
                       <ThemedText type="smallBold" themeColor="accent" style={{ fontFamily: Fonts.serif }}>
@@ -135,17 +131,12 @@ export default function MarkedScreen() {
                       Remove
                     </ThemedText>
                   </Pressable>
-                </View>
+                </Card>
+                </Rise>
               ))
-            : (tab === 'highlights' ? highlights : favourites).map((mark) => (
-                <View
-                  key={mark.id}
-                  style={[
-                    styles.entry,
-                    styles.markRow,
-                    { backgroundColor: theme.backgroundElement, borderColor: theme.border },
-                  ]}
-                >
+            : (tab === 'highlights' ? highlights : favourites).map((mark, index) => (
+                <Rise key={mark.id} delay={index * 30} style={styles.entry}>
+                <Card style={[styles.entryBody, styles.markRow]}>
                   {mark.colour ? (
                     <View
                       style={[styles.chip, { backgroundColor: MARK_TINTS[mark.colour][scheme] }]}
@@ -169,12 +160,13 @@ export default function MarkedScreen() {
                       Remove
                     </ThemedText>
                   </Pressable>
-                </View>
+                </Card>
+                </Rise>
               ))}
           </View>
         </ScrollView>
       </SafeAreaView>
-    </ThemedView>
+    </Ground>
   );
 }
 
@@ -197,15 +189,8 @@ const styles = StyleSheet.create({
   // two or three abreast where there is room instead of stretching one card
   // across a whole desktop display.
   entries: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two },
-  entry: {
-    flexBasis: 340,
-    flexGrow: 1,
-    maxWidth: 480,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: Spacing.two,
-    padding: Spacing.three,
-    gap: Spacing.one,
-  },
+  entry: { flexBasis: 340, flexGrow: 1, maxWidth: 480 },
+  entryBody: { padding: Spacing.three, gap: Spacing.one },
   markRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three },
   grow: { flexGrow: 1, minHeight: 44, justifyContent: 'center' },
   chip: { width: 20, height: 20, borderRadius: 10 },

@@ -16,6 +16,7 @@ import { AccessibilityInfo, Pressable, type StyleProp, type ViewStyle } from 're
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
+  withDelay,
   withSpring,
   withTiming,
   type SharedValue,
@@ -136,6 +137,60 @@ export function SlideIn({
   }));
 
   return <Animated.View style={[style, animated]}>{children}</Animated.View>;
+}
+
+/**
+ * Content that arrives rather than appearing.
+ *
+ * A card lifts the last few points into place as the screen settles. Given a
+ * `delay` per item, a list arrives in sequence, which reads as one movement
+ * instead of everything blinking on at once. Keep the steps small — past
+ * about 200ms of total stagger a screen starts to feel slow rather than alive.
+ */
+export function Rise({
+  children,
+  delay = 0,
+  style,
+}: {
+  readonly children: ReactNode;
+  readonly delay?: number;
+  readonly style?: StyleProp<ViewStyle>;
+}) {
+  const reduced = useReducedMotion();
+  const shown = useSharedValue(0);
+
+  useEffect(() => {
+    if (reduced) {
+      shown.value = 1;
+      return;
+    }
+    shown.value = withDelay(delay, withSpring(1, Settle));
+  }, [reduced, delay, shown]);
+
+  const animated = useAnimatedStyle(() => ({
+    opacity: shown.value,
+    transform: [{ translateY: 14 * (1 - shown.value) }],
+  }));
+
+  return <Animated.View style={[style, reduced ? undefined : animated]}>{children}</Animated.View>;
+}
+
+/**
+ * A bar that fills to its share rather than being drawn already full.
+ *
+ * Progress is the one thing on these screens worth watching happen: seeing
+ * the bar travel says how far along you are in a way a static block does not.
+ */
+export function useFill(fraction: number) {
+  const reduced = useReducedMotion();
+  const grown = useSharedValue(0);
+  const target = Math.max(0, Math.min(1, fraction));
+
+  useEffect(() => {
+    grown.value = reduced ? target : withDelay(120, withSpring(target, Settle));
+  }, [target, reduced, grown]);
+
+  return useAnimatedStyle(() => ({ width: `${grown.value * 100}%` }));
 }
 
 /**

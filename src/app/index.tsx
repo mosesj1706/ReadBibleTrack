@@ -6,14 +6,26 @@ import { portionFor, resumeAt } from '@/bible/plan.ts';
 import { formatReference } from '@/bible/reference.ts';
 import { canonSpan, subtractRanges } from '@/bible/verse-id.ts';
 import { countVerses, progressThrough } from '@/bible/versification.ts';
+import { Card, Ground } from '@/components/surfaces';
+import { Animated, Rise, useFill } from '@/components/motion';
 import { ScriptureText } from '@/components/scripture-text';
 import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Fonts, MaxContentWidth, MaxPageWidth, Spacing, WideBreakpoint } from '@/constants/theme';
+import { Fonts, MaxContentWidth, MaxPageWidth, Radius, Spacing, WideBreakpoint } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { usePlan } from '@/plans/provider';
 import { useProgress } from '@/progress/provider';
 import { usePassage } from '@/scripture/provider';
+
+/** A share of something, drawn by filling rather than by appearing full. */
+function Meter({ fraction }: { readonly fraction: number }) {
+  const theme = useTheme();
+  const fill = useFill(fraction);
+  return (
+    <View style={[styles.meter, { backgroundColor: theme.backgroundSelected }]}>
+      <Animated.View style={[styles.meterFill, { backgroundColor: theme.accent }, fill]} />
+    </View>
+  );
+}
 
 export default function TodayScreen() {
   const theme = useTheme();
@@ -61,7 +73,7 @@ export default function TodayScreen() {
   });
 
   return (
-    <ThemedView style={styles.screen}>
+    <Ground style={styles.screen}>
       <SafeAreaView style={styles.container}>
         <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
           <View style={[styles.header, wide && !split ? styles.solo : undefined]}>
@@ -75,14 +87,10 @@ export default function TodayScreen() {
 
           <View style={split ? styles.split : undefined}>
           <View style={wide ? [styles.column, split ? undefined : styles.solo] : undefined}>
+          <Rise>
           <Link href="/plan" asChild>
-            <Pressable
-              accessibilityRole="link"
-              style={StyleSheet.flatten([
-                styles.planRow,
-                { borderColor: theme.border, backgroundColor: theme.backgroundElement },
-              ])}
-            >
+            <Pressable accessibilityRole="link" style={styles.press}>
+              <Card style={styles.planRow}>
               <View style={styles.planText}>
                 <ThemedText type="small" themeColor="textFaint" style={styles.eyebrow}>
                   Plan
@@ -92,15 +100,13 @@ export default function TodayScreen() {
               <ThemedText type="small" themeColor="accent">
                 {planned ? `Day ${day}` : 'Choose'} ›
               </ThemedText>
+              </Card>
             </Pressable>
           </Link>
+          </Rise>
 
-          <View
-            style={[
-              styles.card,
-              { backgroundColor: theme.backgroundElement, borderColor: theme.border },
-            ]}
-          >
+          <Rise delay={60}>
+          <Card style={styles.card}>
             {planned ? (
               <>
                 <ThemedText type="subtitle" style={[styles.passage, { fontFamily: Fonts.serif }]}>
@@ -113,6 +119,7 @@ export default function TodayScreen() {
                         share > 0 ? ` · ${Math.round(share * 100)}%` : ''
                       }`}
                 </ThemedText>
+                <Meter fraction={share} />
               </>
             ) : (
               <>
@@ -124,11 +131,14 @@ export default function TodayScreen() {
                     ? `${readEverything.toLocaleString()} verses read so far`
                     : 'Nothing read yet — start anywhere.'}
                 </ThemedText>
+                <Meter fraction={readEverything / countVerses([canonSpan()])} />
               </>
             )}
-          </View>
+          </Card>
+          </Rise>
 
           {carryOn ? (
+            <Rise delay={120}>
             <Link
               href={{
                 pathname: '/read/[reference]',
@@ -145,26 +155,24 @@ export default function TodayScreen() {
                 </ThemedText>
               </Pressable>
             </Link>
+            </Rise>
           ) : null}
 
           </View>
 
           {openingVerses.length > 0 ? (
           <View style={wide ? styles.column : undefined}>
-            <View
-              style={[
-                styles.card,
-                { backgroundColor: theme.backgroundElement, borderColor: theme.border },
-              ]}
-            >
+          <Rise delay={180}>
+            <Card style={styles.card}>
               <ScriptureText verses={openingVerses} />
-            </View>
+            </Card>
+          </Rise>
           </View>
           ) : null}
           </View>
         </ScrollView>
       </SafeAreaView>
-    </ThemedView>
+    </Ground>
   );
 }
 
@@ -187,23 +195,21 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: Spacing.two,
     paddingHorizontal: Spacing.three,
     minHeight: 56,
     gap: Spacing.two,
   },
   planText: { gap: Spacing.half, flexShrink: 1 },
-  card: {
-    borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: Spacing.two,
-    padding: Spacing.four,
-    gap: Spacing.two,
-  },
+  // Card supplies the surface, border and elevation; this is only the room
+  // inside it.
+  card: { padding: Spacing.four, gap: Spacing.two },
   passage: { fontSize: 24, lineHeight: 32, fontWeight: '400' },
+  meter: { height: 6, borderRadius: 3, overflow: 'hidden', marginTop: Spacing.one },
+  meterFill: { height: '100%', borderRadius: 3 },
+  press: { borderRadius: Radius.card },
   action: {
     paddingVertical: Spacing.three,
-    borderRadius: Spacing.two,
+    borderRadius: Radius.card,
     alignItems: 'center',
     justifyContent: 'center',
     minHeight: 48,

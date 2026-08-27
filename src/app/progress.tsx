@@ -20,8 +20,9 @@ import {
   countVerses,
   progressThrough,
 } from '@/bible/versification.ts';
+import { Card, Ground } from '@/components/surfaces';
+import { Animated, Rise, useFill } from '@/components/motion';
 import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
 import { Fonts, MaxPageWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useProgress } from '@/progress/provider';
@@ -49,7 +50,7 @@ export default function ProgressScreen() {
   ];
 
   return (
-    <ThemedView style={styles.screen}>
+    <Ground style={styles.screen}>
       <SafeAreaView style={styles.container}>
         <View style={styles.topBar}>
           <Pressable onPress={leave} accessibilityRole="button" style={styles.leave}>
@@ -64,12 +65,8 @@ export default function ProgressScreen() {
             What we’ve read
           </ThemedText>
 
-          <View
-            style={[
-              styles.summary,
-              { backgroundColor: theme.backgroundElement, borderColor: theme.border },
-            ]}
-          >
+          <Rise>
+          <Card style={styles.summary}>
             <ThemedText type="subtitle" style={{ fontFamily: Fonts.serif, fontSize: 30 }}>
               {versesRead.toLocaleString()}
             </ThemedText>
@@ -77,7 +74,8 @@ export default function ProgressScreen() {
               of {TOTAL_VERSES.toLocaleString()} verses · {(whole * 100).toFixed(1)}% of the Bible
             </ThemedText>
             <Bar fraction={whole} />
-          </View>
+          </Card>
+          </Rise>
 
           {testaments.map((testament) => {
             const books = BOOKS.filter((book) => book.testament === testament.key);
@@ -136,23 +134,26 @@ export default function ProgressScreen() {
           })}
         </ScrollView>
       </SafeAreaView>
-    </ThemedView>
+    </Ground>
   );
 }
 
 function Bar({ fraction }: { readonly fraction: number }) {
   const theme = useTheme();
   const filled = Math.max(0, Math.min(1, fraction));
+  const fill = useFill(filled);
   return (
     <View style={[styles.bar, { backgroundColor: theme.backgroundSelected }]}>
-      <View
-        style={{
-          width: `${filled * 100}%`,
-          height: '100%',
-          backgroundColor: filled === 1 ? theme.accent : theme.accent,
-          opacity: filled === 1 ? 1 : 0.75,
-          borderRadius: 3,
-        }}
+      <Animated.View
+        style={[
+          {
+            height: '100%',
+            backgroundColor: theme.accent,
+            opacity: filled === 1 ? 1 : 0.75,
+            borderRadius: 3,
+          },
+          fill,
+        ]}
       />
     </View>
   );
@@ -165,12 +166,7 @@ const styles = StyleSheet.create({
   leave: { minHeight: 44, justifyContent: 'center' },
   scroll: { paddingHorizontal: Spacing.four, paddingBottom: Spacing.six, gap: Spacing.three },
   title: { fontSize: 34, lineHeight: 40, fontWeight: '400' },
-  summary: {
-    borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: Spacing.two,
-    padding: Spacing.four,
-    gap: Spacing.two,
-  },
+  summary: { padding: Spacing.four, gap: Spacing.two },
   section: { gap: Spacing.half, marginTop: Spacing.two },
   eyebrow: { textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: Spacing.two },
   // Sixty-six books in one column is a very long scroll and, on a desktop,
