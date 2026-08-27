@@ -45,3 +45,6 @@ example
 # Verification screenshots. Kept on disk, not in the repo — they are
 # artifacts of testing, not source.
 shots/
+
+# Browser-automation scratch from local UI checks
+.playwright-mcp/

@@ -8,10 +8,11 @@
  */
 
 import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
 
 import { BOOKS, getBook } from '@/bible/canon.ts';
 import { lastVerse, verseCounts } from '@/bible/versification.ts';
+import { Tappable } from '@/components/motion';
 import { ThemedText } from '@/components/themed-text';
 import { Fonts, Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -72,7 +73,7 @@ export function PassagePalette({
                 {BOOKS.filter((b) => b.testament === testament).map((b) => {
                   const here = b.number === book;
                   return (
-                    <Pressable
+                    <Tappable
                       key={b.number}
                       onPress={() => {
                         setChosenBook(b.number);
@@ -95,7 +96,7 @@ export function PassagePalette({
                       >
                         {b.name}
                       </ThemedText>
-                    </Pressable>
+                    </Tappable>
                   );
                 })}
               </View>
@@ -158,11 +159,11 @@ function Crumb({
   readonly onPress: () => void;
 }) {
   return (
-    <Pressable onPress={onPress} accessibilityRole="button" style={styles.crumb}>
+    <Tappable onPress={onPress} accessibilityRole="button" style={styles.crumb}>
       <ThemedText type={active ? 'smallBold' : 'small'} themeColor={active ? 'accent' : 'textSecondary'}>
         {label}
       </ThemedText>
-    </Pressable>
+    </Tappable>
   );
 }
 
@@ -179,7 +180,7 @@ function Tile({
 }) {
   const theme = useTheme();
   return (
-    <Pressable
+    <Tappable
       onPress={onPress}
       onLongPress={onLongPress}
       accessibilityRole="button"
@@ -201,7 +202,7 @@ function Tile({
       >
         {label}
       </ThemedText>
-    </Pressable>
+    </Tappable>
   );
 }
 

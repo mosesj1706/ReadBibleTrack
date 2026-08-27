@@ -57,6 +57,7 @@ function Verse({
   hasNote,
   selected,
   onSelect,
+  onLayoutY,
 }: {
   readonly verse: ScriptureVerse;
   readonly heading?: string;
@@ -67,6 +68,7 @@ function Verse({
   readonly hasNote?: boolean;
   readonly selected?: boolean;
   readonly onSelect?: (verse: ScriptureVerse) => void;
+  readonly onLayoutY?: (id: VerseId, y: number) => void;
 }) {
   const theme = useTheme();
   const pieces = cut(
@@ -87,6 +89,9 @@ function Verse({
       ) : null}
       <ThemedText
         onPress={onSelect ? () => onSelect(verse) : undefined}
+        onLayout={
+          onLayoutY ? (event) => onLayoutY(verse.id, event.nativeEvent.layout.y) : undefined
+        }
         suppressHighlighting
         style={[
           styles.verse,
@@ -134,6 +139,7 @@ export function ScriptureText({
   notedOn,
   selectedId,
   onSelect,
+  onVerseLayout,
 }: {
   readonly verses: readonly ScriptureVerse[];
   readonly headings?: ReadonlyMap<VerseId, string>;
@@ -144,6 +150,11 @@ export function ScriptureText({
   readonly notedOn?: (id: VerseId) => boolean;
   readonly selectedId?: VerseId;
   readonly onSelect?: (verse: ScriptureVerse) => void;
+  /**
+   * Where each verse sits inside this block, so a caller that owns the scroll
+   * view can jump to one. The y is relative to this component's own root.
+   */
+  readonly onVerseLayout?: (id: VerseId, y: number) => void;
 }) {
   const theme = useTheme();
 
@@ -171,6 +182,7 @@ export function ScriptureText({
           hasNote={notedOn?.(verse.id)}
           selected={selectedId === verse.id}
           onSelect={onSelect}
+          onLayoutY={onVerseLayout}
         />
       ))}
 

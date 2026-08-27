@@ -44,9 +44,15 @@ export function TranslationPicker() {
 }
 
 const styles = StyleSheet.create({
-  row: { flexDirection: 'row', gap: Spacing.two, flexWrap: 'wrap' },
+  // Natural width on purpose: the chips must never stack one per line, and
+  // must never grow and shove the bar's other controls onto a row of their
+  // own. The bar decides what wraps; this just stays the size it needs.
+  row: { flexDirection: 'row', gap: Spacing.two },
   chip: {
-    paddingHorizontal: Spacing.three,
+    // Snug on purpose: the labels are three letters, and at 16pt of side
+    // padding the three chips plus the bar's other controls came a hair over
+    // a 390pt phone's width and wrapped the whole row for the sake of 1pt.
+    paddingHorizontal: Spacing.two,
     borderRadius: Spacing.four,
     borderWidth: StyleSheet.hairlineWidth,
     // Comfortably tappable with a thumb, not just a mouse pointer.

@@ -8,8 +8,10 @@
  */
 
 import { Stack, router, useLocalSearchParams } from 'expo-router';
-import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
+import type { ScrollView } from 'react-native';
+import { useAnimatedRef, useAnimatedScrollHandler, useSharedValue } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { getBook } from '@/bible/canon.ts';
@@ -17,6 +19,7 @@ import { formatReference, parseReference } from '@/bible/reference.ts';
 import { fromVerseId } from '@/bible/verse-id.ts';
 import { chapterRange, nextChapter, previousChapter } from '@/bible/versification.ts';
 import { ChapterMarkings } from '@/components/chapter-markings';
+import { Animated, SlideIn, useCollapse } from '@/components/motion';
 import { PassagePalette } from '@/components/passage-palette';
 import { ScriptureText } from '@/components/scripture-text';
 import { Glass, Ground, Page } from '@/components/surfaces';
@@ -70,6 +73,46 @@ export default function ReaderScreen() {
   // On a narrow screen the panels become one drawer at a time, because two
   // columns beside a reading measure leaves nothing for the reading.
   const [drawer, setDrawer] = useState<'none' | 'palette' | 'marks'>('none');
+
+  // How far into the chapter you have read. Kept on the UI thread so the
+  // header can fold away without a round trip per frame.
+  const scrolled = useSharedValue(0);
+  const onScroll = useAnimatedScrollHandler((event) => {
+    scrolled.value = event.contentOffset.y;
+  });
+  const chromeStyle = useCollapse(scrolled, 52);
+
+  // Jumping to a verse. The palette can name one, and a reference like
+  // "John 14:20" should land on verse 20 rather than the top of the chapter.
+  // Verses report their own offsets as they lay out, which happens after the
+  // passage loads, so the jump waits for the verse it was asked for.
+  const scroller = useAnimatedRef<ScrollView>();
+  const offsets = useRef(new Map<number, number>());
+  const wanted = requested && range && requested.start !== range.start
+    ? requested.start
+    : undefined;
+  // Cleared per reference so the same verse can be picked again after
+  // scrolling away from it.
+  const jumped = useRef<number | undefined>(undefined);
+  useEffect(() => {
+    offsets.current.clear();
+    jumped.current = undefined;
+  }, [at.book, at.chapter]);
+
+  const jumpIfReady = useCallback(
+    (id: number, y: number) => {
+      offsets.current.set(id, y);
+      if (wanted === undefined || jumped.current === wanted || id !== wanted) return;
+      jumped.current = wanted;
+      // Sits the verse a little below the chapter bar rather than flush
+      // against it, so it reads as the top of a passage, not a cut-off one.
+      scroller.current?.scrollTo({ y: Math.max(y - Spacing.four, 0), animated: true });
+      // Deliberately not selected: asking to go to a verse is navigation, and
+      // opening the mark-and-note sheet over half the screen answers a
+      // question nobody asked. Landing at the top of the view says enough.
+    },
+    [wanted, scroller],
+  );
 
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const { marks, notes: written } = useMarks();
@@ -138,7 +181,7 @@ export default function ReaderScreen() {
         <View style={styles.columns}>
         {wide ? <Glass style={styles.side}>{palette}</Glass> : null}
         <View style={styles.middle}>
-        <View style={[styles.bar, { borderBottomColor: theme.border }]}>
+        <Animated.View style={[styles.bar, { borderBottomColor: theme.border }, chromeStyle]}>
           <Step
             label="‹"
             hint={previous ? formatReference(chapterRange(previous.book, previous.chapter)!) : undefined}
@@ -158,10 +201,16 @@ export default function ReaderScreen() {
               next ? () => open(formatReference(chapterRange(next.book, next.chapter)!)) : undefined
             }
           />
-        </View>
+        </Animated.View>
 
         <Page style={styles.pageFill}>
-        <ScrollView contentContainerStyle={styles.text} showsVerticalScrollIndicator={false}>
+        <Animated.ScrollView
+          ref={scroller}
+          onScroll={onScroll}
+          scrollEventThrottle={16}
+          contentContainerStyle={styles.text}
+          showsVerticalScrollIndicator={false}
+        >
           <ScriptureText
             verses={passage.verses}
             headings={passage.headings}
@@ -171,6 +220,7 @@ export default function ReaderScreen() {
             notedOn={notedOn}
             selectedId={selected}
             onSelect={(verse) => setSelected((at) => (at === verse.id ? undefined : verse.id))}
+            onVerseLayout={jumpIfReady}
           />
 
 
@@ -190,7 +240,7 @@ export default function ReaderScreen() {
               {read ? `✓ ${title} read` : `Mark ${title} read`}
             </ThemedText>
           </Pressable>
-        </ScrollView>
+        </Animated.ScrollView>
         </Page>
         </View>
         {wide ? <Glass style={styles.side}>{markings}</Glass> : null}
@@ -199,9 +249,15 @@ export default function ReaderScreen() {
         {/* One drawer at a time on a narrow screen. */}
         {!wide && drawer !== 'none' ? (
           <View style={styles.drawer} pointerEvents="box-none">
-            <Glass floating style={styles.drawerPanel}>
-              {drawer === 'palette' ? palette : markings}
-            </Glass>
+            <SlideIn
+              visible
+              fromX={drawer === 'palette' ? -40 : 40}
+              style={styles.drawerPanel}
+            >
+              <Glass floating style={styles.drawerFill}>
+                {drawer === 'palette' ? palette : markings}
+              </Glass>
+            </SlideIn>
           </View>
         ) : null}
 
@@ -210,7 +266,9 @@ export default function ReaderScreen() {
             not an interaction. */}
         {selected !== undefined ? (
           <View style={styles.sheetHolder} pointerEvents="box-none">
-            <VerseActions verseId={selected} onClose={() => setSelected(undefined)} />
+            <SlideIn visible fromY={28}>
+              <VerseActions verseId={selected} onClose={() => setSelected(undefined)} />
+            </SlideIn>
           </View>
         ) : null}
       </SafeAreaView>
@@ -291,7 +349,10 @@ const styles = StyleSheet.create({
   side: { width: 248, minHeight: 0, marginBottom: Spacing.three },
   middle: { flex: 1, minHeight: 0, maxWidth: MaxContentWidth, width: '100%', overflow: 'hidden' },
   pageFill: { flex: 1, minHeight: 0, marginBottom: Spacing.three },
-  toggles: { flexDirection: 'row', gap: Spacing.one },
+  // No auto margin here: it would absorb the bar's free space and force a
+  // wrap even on a 390pt phone that has room for one row. These keep their
+  // size and drop to a second row only when the bar genuinely runs out.
+  toggles: { flexDirection: 'row', gap: Spacing.one, flexShrink: 0 },
   toggle: {
     minWidth: 44,
     minHeight: 44,
@@ -302,6 +363,7 @@ const styles = StyleSheet.create({
   },
   drawer: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, padding: Spacing.three },
   drawerPanel: { flex: 1 },
+  drawerFill: { flex: 1 },
   bar: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -309,6 +371,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.three,
     paddingBottom: Spacing.two,
     borderBottomWidth: StyleSheet.hairlineWidth,
+    // The bar folds to nothing on scroll; without this the chapter title
+    // spills out of the shrinking box instead of being clipped by it.
+    overflow: 'hidden',
   },
   // 44pt is Apple's minimum touch target and Android's is close to it. The
   // glyph is small; the tappable area must not be.
@@ -319,8 +384,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.three,
     paddingBottom: Spacing.two,
     gap: Spacing.two,
+    // On a phone too narrow for one row — a 320pt screen with three
+    // translations — the chips drop to a second line rather than pushing the
+    // panel toggles off the edge, where they were unreachable.
+    flexWrap: 'wrap',
   },
-  leave: { minHeight: 44, justifyContent: 'center', paddingRight: Spacing.two },
+  leave: { minHeight: 44, justifyContent: 'center', paddingRight: Spacing.two, flexShrink: 0 },
   step: {
     paddingHorizontal: Spacing.three,
     minWidth: 44,

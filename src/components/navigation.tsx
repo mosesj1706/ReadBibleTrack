@@ -11,9 +11,10 @@
  */
 
 import { Link, usePathname } from 'expo-router';
-import { Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { StyleSheet, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { Tappable } from '@/components/motion';
 import { Glass } from '@/components/surfaces';
 import { ThemedText } from '@/components/themed-text';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
@@ -51,7 +52,7 @@ export function AppNavigation({ children }: { readonly children: React.ReactNode
 
     return (
       <Link key={destination.href} href={destination.href} asChild>
-        <Pressable
+        <Tappable
           accessibilityRole="link"
           accessibilityState={{ selected: active }}
           style={StyleSheet.flatten([
@@ -72,7 +73,7 @@ export function AppNavigation({ children }: { readonly children: React.ReactNode
           <ThemedText type={active ? 'smallBold' : 'small'} themeColor={active ? 'accent' : 'textSecondary'}>
             {destination.label}
           </ThemedText>
-        </Pressable>
+        </Tappable>
       </Link>
     );
   });
