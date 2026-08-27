@@ -182,7 +182,7 @@ export default function ReaderScreen() {
         </Glass>
 
         <View style={styles.columns}>
-        {wide ? <Glass style={styles.side}>{palette}</Glass> : null}
+        {wide ? <Glass solid style={styles.side}>{palette}</Glass> : null}
         <View style={styles.middle}>
         <Animated.View style={[styles.bar, { borderBottomColor: theme.border }, chromeStyle]}>
           <Step
@@ -246,7 +246,7 @@ export default function ReaderScreen() {
         </Animated.ScrollView>
         </Page>
         </View>
-        {wide ? <Glass style={styles.side}>{markings}</Glass> : null}
+        {wide ? <Glass solid style={styles.side}>{markings}</Glass> : null}
         </View>
 
         {/* One drawer at a time on a narrow screen. */}
@@ -257,7 +257,7 @@ export default function ReaderScreen() {
               fromX={drawer === 'palette' ? -40 : 40}
               style={styles.drawerPanel}
             >
-              <Glass floating style={styles.drawerFill}>
+              <Glass floating solid style={styles.drawerFill}>
                 {drawer === 'palette' ? palette : markings}
               </Glass>
             </SlideIn>

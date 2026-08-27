@@ -24,8 +24,17 @@ export const Colors = {
     background: '#E7EDF7',
     backgroundTint: '#EFEAF4',
     backgroundWarm: '#F6EFE7',
-    /** Frosted chrome: palettes, bars, floating panels. */
-    glass: 'rgba(255,255,255,0.62)',
+    /**
+     * Frosted chrome: bars and floating panels.
+     *
+     * 0.62 was too see-through: a books list laid over a chapter let the
+     * scripture behind read through the book names, and the two sets of words
+     * interleaved. Chrome that carries text of its own has to win against
+     * whatever is behind it, so `glassSolid` is what panels use — the lighter
+     * value is only for bars that hold a few controls.
+     */
+    glass: 'rgba(255,255,255,0.78)',
+    glassSolid: 'rgba(252,253,255,0.97)',
     glassBorder: 'rgba(255,255,255,0.75)',
     /** Raised surfaces: cards, list rows, controls. */
     backgroundElement: '#FBFCFE',
@@ -49,7 +58,8 @@ export const Colors = {
     background: '#0D131E',
     backgroundTint: '#141A28',
     backgroundWarm: '#1B1622',
-    glass: 'rgba(30,38,50,0.58)',
+    glass: 'rgba(30,38,50,0.80)',
+    glassSolid: 'rgba(20,26,36,0.97)',
     glassBorder: 'rgba(255,255,255,0.10)',
     backgroundElement: '#1A222D',
     backgroundSelected: '#242E3B',

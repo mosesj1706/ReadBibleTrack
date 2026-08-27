@@ -101,10 +101,17 @@ export function Glass({
   children,
   style,
   floating = false,
+  solid = false,
 }: {
   readonly children: ReactNode;
   readonly style?: StyleProp<ViewStyle>;
   readonly floating?: boolean;
+  /**
+   * For a panel that carries text of its own — a list of books, a chapter's
+   * markings. Frosted enough to still read as a layer, opaque enough that the
+   * words behind it do not interleave with the words on it.
+   */
+  readonly solid?: boolean;
 }) {
   const theme = useTheme();
   return (
@@ -112,7 +119,7 @@ export function Glass({
       style={[
         styles.glass,
         {
-          backgroundColor: theme.glass,
+          backgroundColor: solid ? theme.glassSolid : theme.glass,
           borderColor: theme.glassBorder,
         },
         Platform.OS === 'web' ? ({ backdropFilter: 'blur(18px) saturate(150%)' } as ViewStyle) : null,

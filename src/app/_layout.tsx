@@ -2,7 +2,7 @@ import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useColorScheme } from 'react-native';
 
-import { AppNavigation } from '@/components/navigation';
+import { AppNavigation, directionForNextScreen } from '@/components/navigation';
 import { Colors } from '@/constants/theme';
 import { AuthGate } from '@/auth/gate';
 import { AuthProvider } from '@/auth/provider';
@@ -26,10 +26,14 @@ export default function RootLayout() {
                 <MarksProvider>
                   <AppNavigation>
                     <Stack
-                      screenOptions={{
+                      // A function, not an object: it is evaluated as each
+                      // screen is pushed, which is what lets the tab bar decide
+                      // the direction of travel a moment beforehand.
+                      screenOptions={() => ({
                         headerShown: false,
+                        animation: directionForNextScreen(),
                         contentStyle: { backgroundColor: theme.background },
-                      }}
+                      })}
                     />
                   </AppNavigation>
                 </MarksProvider>

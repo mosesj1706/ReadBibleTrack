@@ -10,11 +10,12 @@
  * than a persistent bar competing with the text.
  */
 
-import { Link, usePathname } from 'expo-router';
+import { router, usePathname } from 'expo-router';
 import { StyleSheet, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Tappable } from '@/components/motion';
+import { TABS, slideDirection, type Slide } from '@/navigation/order.ts';
 import { Glass } from '@/components/surfaces';
 import { ThemedText } from '@/components/themed-text';
 import { MaxPageWidth, Spacing } from '@/constants/theme';
@@ -23,13 +24,23 @@ import { useTheme } from '@/hooks/use-theme';
 /** Wide enough that a bottom bar would look stranded. */
 const WIDE = 900;
 
-const DESTINATIONS = [
-  { href: '/', label: 'Today' },
-  { href: '/progress', label: 'Read' },
-  { href: '/marked', label: 'Marked' },
-  { href: '/circle', label: 'Circle' },
-  { href: '/profile', label: 'You' },
-] as const;
+/**
+ * Which way the next screen should travel.
+ *
+ * Every screen used to arrive from the right, whichever tab you came from, so
+ * moving from "You" back to "Today" felt like going further forward. The tabs
+ * are laid out in a row and the movement should agree with them.
+ *
+ * A module-level value rather than state: the navigator reads it while
+ * pushing, which happens after the tap handler has run and before any
+ * re-render could deliver it. The decision itself lives in `navigation/order`,
+ * where it can be tested.
+ */
+let pendingDirection: Slide = 'slide_from_right';
+
+export function directionForNextScreen(): Slide {
+  return pendingDirection;
+}
 
 /** Screens that own the whole window. */
 function isImmersive(pathname: string): boolean {
@@ -45,16 +56,22 @@ export function AppNavigation({ children }: { readonly children: React.ReactNode
   const wide = width >= WIDE;
   const hidden = isImmersive(pathname);
 
-  const items = DESTINATIONS.map((destination) => {
+  const items = TABS.map((destination) => {
     // "/" would otherwise match everything.
     const active =
       destination.href === '/' ? pathname === '/' : pathname.startsWith(destination.href);
 
     return (
-      <Link key={destination.href} href={destination.href} asChild>
         <Tappable
+          key={destination.href}
           accessibilityRole="link"
           accessibilityState={{ selected: active }}
+          onPress={() => {
+            if (active) return;
+            // Set before navigating: the navigator reads it as it pushes.
+            pendingDirection = slideDirection(pathname, destination.href);
+            router.navigate(destination.href);
+          }}
           style={StyleSheet.flatten([
             wide ? styles.railItem : styles.barItem,
             active && wide
@@ -74,7 +91,6 @@ export function AppNavigation({ children }: { readonly children: React.ReactNode
             {destination.label}
           </ThemedText>
         </Tappable>
-      </Link>
     );
   });
 

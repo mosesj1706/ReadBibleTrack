@@ -43,7 +43,7 @@ export function VerseActions({
   const toHere = readUpTo(verseId, bookmark);
 
   return (
-    <Glass floating style={styles.sheet}>
+    <Glass floating solid style={styles.sheet}>
       <View style={styles.headerRow}>
         <ThemedText type="smallBold" style={{ fontFamily: Fonts.serif }}>
           {formatReference(range)}

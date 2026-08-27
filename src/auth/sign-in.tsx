@@ -12,8 +12,8 @@
  * goes wrong for the people this app is for.
  */
 
-import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { useState } from 'react';
+import { ActivityIndicator, Keyboard, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
@@ -36,16 +36,6 @@ export function SignInScreen() {
   const [code, setCode] = useState('');
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | undefined>();
-
-  // `autoFocus` is not enough here: the field mounts as the screen swaps, and
-  // on iOS it comes up without the keyboard, leaving someone staring at a code
-  // they cannot type. Focus it once it has actually mounted.
-  const codeField = useRef<TextInput>(null);
-  useEffect(() => {
-    if (stage !== 'code') return;
-    const timer = setTimeout(() => codeField.current?.focus(), 120);
-    return () => clearTimeout(timer);
-  }, [stage]);
 
   const looksLikeEmail = /^\S+@\S+\.\S+$/.test(email.trim());
 
@@ -78,6 +68,16 @@ export function SignInScreen() {
 
   return (
     <ThemedView style={styles.screen}>
+      {/* A dismiss layer *behind* the content, not wrapped around it. Wrapping
+          was the obvious thing and it was wrong: the outer press handler
+          swallowed the tap meant for the field, so the keyboard could never be
+          summoned in the first place. Underneath, it only catches the taps
+          that miss everything else. */}
+      <Pressable
+        style={StyleSheet.absoluteFill}
+        onPress={Keyboard.dismiss}
+        accessible={false}
+      />
       <SafeAreaView style={styles.container}>
         <View style={styles.header}>
           <ThemedText type="small" themeColor="textFaint" style={styles.eyebrow}>
@@ -107,10 +107,10 @@ export function SignInScreen() {
               inputMode="email"
               keyboardType="email-address"
               editable={!busy}
-              autoFocus
-              onSubmitEditing={() =>
-                looksLikeEmail && attempt(() => sendCode(email), () => setStage('code'))
-              }
+              onSubmitEditing={() => {
+                Keyboard.dismiss();
+                if (looksLikeEmail) attempt(() => sendCode(email), () => setStage('code'));
+              }}
               returnKeyType="send"
             />
             <Action
@@ -136,7 +136,6 @@ export function SignInScreen() {
         ) : (
           <View style={styles.form}>
             <TextInput
-              ref={codeField}
               style={[styles.input, styles.codeInput, field]}
               value={code}
               onChangeText={(next) => setCode(next.replace(/\D/g, '').slice(0, CODE_MAX))}
@@ -147,9 +146,11 @@ export function SignInScreen() {
               autoComplete="one-time-code"
               textContentType="oneTimeCode"
               editable={!busy}
-              autoFocus
               returnKeyType="go"
-              onSubmitEditing={() => code.length >= CODE_MIN && attempt(() => verifyCode(email, code))}
+              onSubmitEditing={() => {
+                Keyboard.dismiss();
+                if (code.length >= CODE_MIN) attempt(() => verifyCode(email, code));
+              }}
             />
             <Action
               label="Sign in"

@@ -193,12 +193,15 @@ export default function TodayScreen() {
 const styles = StyleSheet.create({
   screen: { flex: 1, flexDirection: 'row', justifyContent: 'center' },
   container: { flex: 1, width: '100%', maxWidth: MaxPageWidth },
-  scroll: { paddingHorizontal: Spacing.four, paddingBottom: Spacing.six, gap: Spacing.four },
+  // The blocks on this screen are separate thoughts — which plan, what to
+  // read, the button, a taste of it — so they get room to be separate. At the
+  // old spacing they read as one stack of touching boxes on a phone.
+  scroll: { paddingHorizontal: Spacing.four, paddingBottom: Spacing.six, gap: Spacing.five },
   header: { paddingTop: Spacing.four, gap: Spacing.two },
   // Two columns on a display, one on a phone. The reading measure still caps
   // the column that holds the passage itself.
-  split: { flexDirection: 'row', gap: Spacing.four, alignItems: 'flex-start' },
-  column: { flex: 1, gap: Spacing.four, maxWidth: MaxContentWidth },
+  split: { flexDirection: 'row', gap: Spacing.five, alignItems: 'flex-start' },
+  column: { flex: 1, gap: Spacing.five, maxWidth: MaxContentWidth },
   // When there is only one column, it and the heading above it centre
   // together rather than sitting against the left edge of a display neither
   // of them is filling.
