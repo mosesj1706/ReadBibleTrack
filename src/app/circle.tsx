@@ -17,12 +17,13 @@ import {
   View,
   useWindowDimensions,
 } from 'react-native';
+import { useAnimatedScrollHandler, useSharedValue } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { canonSpan, normaliseRanges, type VerseRange } from '@/bible/verse-id.ts';
 import { TOTAL_VERSES, countVerses, progressThrough } from '@/bible/versification.ts';
 import { Card, Ground } from '@/components/surfaces';
-import { Rise } from '@/components/motion';
+import { Animated, Rise  } from '@/components/motion';
 import { ThemedText } from '@/components/themed-text';
 import { Fonts, MaxPageWidth, Spacing, WideBreakpoint } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -48,6 +49,12 @@ function leave(): void {
 
 export default function CircleScreen() {
   const theme = useTheme();
+  // The ground drifts against this, so scrolling reads as a near plane moving
+  // over a far one rather than content sliding on a flat colour.
+  const scrolled = useSharedValue(0);
+  const onScroll = useAnimatedScrollHandler((event) => {
+    scrolled.value = event.contentOffset.y;
+  });
   const { width } = useWindowDimensions();
   const wide = width >= WideBreakpoint;
   const { session } = useAuth();
@@ -110,7 +117,7 @@ export default function CircleScreen() {
 
   if (loading) {
     return (
-      <Ground style={styles.screen}>
+      <Ground style={styles.screen} scroll={scrolled}>
         <SafeAreaView style={[styles.container, styles.middle]}>
           <ActivityIndicator color={theme.accent} />
         </SafeAreaView>
@@ -119,7 +126,7 @@ export default function CircleScreen() {
   }
 
   return (
-    <Ground style={styles.screen}>
+    <Ground style={styles.screen} scroll={scrolled}>
       <SafeAreaView style={styles.container}>
         <View style={styles.topBar}>
           <Pressable onPress={leave} accessibilityRole="button" style={styles.leaveBtn}>
@@ -129,7 +136,10 @@ export default function CircleScreen() {
           </Pressable>
         </View>
 
-        <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+        <Animated.ScrollView
+          onScroll={onScroll}
+          scrollEventThrottle={16}
+          contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
           {circle ? (
             <>
               <ThemedText type="title" style={[styles.title, { fontFamily: Fonts.serif }]}>
@@ -390,7 +400,7 @@ export default function CircleScreen() {
               </ThemedText>
             </View>
           ) : null}
-        </ScrollView>
+        </Animated.ScrollView>
       </SafeAreaView>
     </Ground>
   );

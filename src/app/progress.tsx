@@ -9,6 +9,7 @@
 
 import { Link, router } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { useAnimatedScrollHandler, useSharedValue } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { BOOKS } from '@/bible/canon.ts';
@@ -36,6 +37,12 @@ function leave(): void {
 
 export default function ProgressScreen() {
   const theme = useTheme();
+  // The ground drifts against this, so scrolling reads as a near plane moving
+  // over a far one rather than content sliding on a flat colour.
+  const scrolled = useSharedValue(0);
+  const onScroll = useAnimatedScrollHandler((event) => {
+    scrolled.value = event.contentOffset.y;
+  });
   const { ranges: read } = useProgress();
 
   const versesRead = countVerses(read);
@@ -49,7 +56,7 @@ export default function ProgressScreen() {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
 
   return (
-    <Ground style={styles.screen}>
+    <Ground style={styles.screen} scroll={scrolled}>
       <SafeAreaView style={styles.container}>
         <View style={styles.topBar}>
           <Pressable onPress={leave} accessibilityRole="button" style={styles.leave}>
@@ -59,7 +66,10 @@ export default function ProgressScreen() {
           </Pressable>
         </View>
 
-        <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+        <Animated.ScrollView
+          onScroll={onScroll}
+          scrollEventThrottle={16}
+          contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
           <ThemedText type="title" style={[styles.title, { fontFamily: Fonts.serif }]}>
             What we’ve read
           </ThemedText>
@@ -137,7 +147,7 @@ export default function ProgressScreen() {
               </View>
             );
           })}
-        </ScrollView>
+        </Animated.ScrollView>
       </SafeAreaView>
     </Ground>
   );

@@ -1,5 +1,6 @@
 import { Link } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { useAnimatedScrollHandler, useSharedValue } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { portionFor, resumeAt } from '@/bible/plan.ts';
@@ -29,6 +30,13 @@ function Meter({ fraction }: { readonly fraction: number }) {
 
 export default function TodayScreen() {
   const theme = useTheme();
+  // The ground drifts against this, so scrolling reads as a near plane moving
+  // over a far one rather than content sliding on a flat colour.
+  const scrolled = useSharedValue(0);
+  const onScroll = useAnimatedScrollHandler((event) => {
+    scrolled.value = event.contentOffset.y;
+  });
+
   const { width } = useWindowDimensions();
   // Wide enough for two columns: what to read beside a taste of it. Stacked,
   // the passage preview sits below the fold and may as well not be there.
@@ -73,9 +81,12 @@ export default function TodayScreen() {
   });
 
   return (
-    <Ground style={styles.screen}>
+    <Ground style={styles.screen} scroll={scrolled}>
       <SafeAreaView style={styles.container}>
-        <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+        <Animated.ScrollView
+          onScroll={onScroll}
+          scrollEventThrottle={16}
+          contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
           <View style={[styles.header, wide && !split ? styles.solo : undefined]}>
             <ThemedText type="small" themeColor="textFaint" style={styles.eyebrow}>
               {today}
@@ -173,7 +184,7 @@ export default function TodayScreen() {
           </View>
           ) : null}
           </View>
-        </ScrollView>
+        </Animated.ScrollView>
       </SafeAreaView>
     </Ground>
   );

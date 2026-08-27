@@ -8,12 +8,13 @@
 import { Link, router } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { useAnimatedScrollHandler, useSharedValue } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { formatReference } from '@/bible/reference.ts';
 import type { VerseRange } from '@/bible/verse-id.ts';
 import { Card, Ground } from '@/components/surfaces';
-import { Rise } from '@/components/motion';
+import { Animated, Rise  } from '@/components/motion';
 import { ThemedText } from '@/components/themed-text';
 import { Fonts, MaxPageWidth, Spacing } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -41,6 +42,12 @@ function Passage({ range, children }: { readonly range: VerseRange; readonly chi
 
 export default function MarkedScreen() {
   const theme = useTheme();
+  // The ground drifts against this, so scrolling reads as a near plane moving
+  // over a far one rather than content sliding on a flat colour.
+  const scrolled = useSharedValue(0);
+  const onScroll = useAnimatedScrollHandler((event) => {
+    scrolled.value = event.contentOffset.y;
+  });
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const { marks, notes, ready, forgetMark, forgetNote } = useMarks();
   const [tab, setTab] = useState<Tab>('highlights');
@@ -61,7 +68,7 @@ export default function MarkedScreen() {
   };
 
   return (
-    <Ground style={styles.screen}>
+    <Ground style={styles.screen} scroll={scrolled}>
       <SafeAreaView style={styles.container}>
         <View style={styles.topBar}>
           <Pressable onPress={leave} accessibilityRole="button" style={styles.leave}>
@@ -71,7 +78,10 @@ export default function MarkedScreen() {
           </Pressable>
         </View>
 
-        <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+        <Animated.ScrollView
+          onScroll={onScroll}
+          scrollEventThrottle={16}
+          contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
           <ThemedText type="title" style={[styles.title, { fontFamily: Fonts.serif }]}>
             Marked
           </ThemedText>
@@ -164,7 +174,7 @@ export default function MarkedScreen() {
                 </Rise>
               ))}
           </View>
-        </ScrollView>
+        </Animated.ScrollView>
       </SafeAreaView>
     </Ground>
   );

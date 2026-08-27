@@ -13,6 +13,13 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import type { ReactNode } from 'react';
 import { Platform, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  type SharedValue,
+} from 'react-native-reanimated';
+
+import { useReducedMotion } from '@/components/motion';
 
 import { Elevation, Radius, Spacing } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -24,17 +31,62 @@ import { useTheme } from '@/hooks/use-theme';
  * An absolutely positioned tint block was tried first and left a hard edge
  * across the screen wherever it stopped — a gradient in description only.
  */
-export function Ground({ children, style }: { readonly children: ReactNode; readonly style?: StyleProp<ViewStyle> }) {
+export function Ground({
+  children,
+  style,
+  tint,
+  scroll,
+}: {
+  readonly children: ReactNode;
+  readonly style?: StyleProp<ViewStyle>;
+  /**
+   * A colour to wash the ground with — the current book's division, in the
+   * reader. It is what makes the margins either side of a chapter belong to
+   * Psalms or to the Gospels rather than being the same grey everywhere.
+   */
+  readonly tint?: string;
+  /**
+   * A scroll offset to drift against. The ground moves at a fraction of the
+   * content's speed, which is what reads as depth: the page is a near thing
+   * sliding over a far one.
+   */
+  readonly scroll?: SharedValue<number>;
+}) {
   const theme = useTheme();
+  const reduced = useReducedMotion();
+  // A stand-in so the hooks below are called the same number of times whether
+  // or not a caller passed a scroll offset.
+  const still = useSharedValue(0);
+  const offset = scroll ?? still;
+
+  const drift = useAnimatedStyle(() => {
+    if (reduced) return {};
+    // Capped: past a screen or so of travel the ground has said what it has to
+    // say, and letting it run forever would drag the gradient off the top.
+    const travel = Math.min(offset.value, 1400);
+    return { transform: [{ translateY: -travel * 0.08 }] };
+  });
+
   return (
     <View style={[styles.fill, { backgroundColor: theme.background }, style]}>
-      <LinearGradient
-        pointerEvents="none"
-        colors={[theme.backgroundTint, theme.background]}
-        start={{ x: 0.1, y: 0 }}
-        end={{ x: 0.9, y: 1 }}
-        style={StyleSheet.absoluteFill}
-      />
+      <Animated.View pointerEvents="none" style={[styles.drift, drift]}>
+        <LinearGradient
+          colors={[theme.background, theme.backgroundTint, theme.backgroundWarm]}
+          locations={[0, 0.55, 1]}
+          start={{ x: 0.05, y: 0 }}
+          end={{ x: 0.95, y: 1 }}
+          style={StyleSheet.absoluteFill}
+        />
+        {tint ? (
+          <LinearGradient
+            colors={[`${tint}2E`, `${tint}12`, 'transparent']}
+            locations={[0, 0.45, 1]}
+            start={{ x: 0.5, y: 0 }}
+            end={{ x: 0.5, y: 1 }}
+            style={StyleSheet.absoluteFill}
+          />
+        ) : null}
+      </Animated.View>
       <View style={styles.fill}>{children}</View>
     </View>
   );
@@ -117,6 +169,9 @@ export function useShadowColor(): string {
 
 const styles = StyleSheet.create({
   fill: { flex: 1 },
+  // Taller than the screen and hung above it, so drifting upward never
+  // uncovers a hard edge at the bottom.
+  drift: { position: 'absolute', left: 0, right: 0, top: -120, bottom: -220 },
   glass: {
     borderRadius: Radius.panel,
     borderWidth: StyleSheet.hairlineWidth,

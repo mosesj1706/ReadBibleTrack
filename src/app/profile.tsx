@@ -9,9 +9,11 @@
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { useAnimatedScrollHandler, useSharedValue } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
+import { Animated } from '@/components/motion';
 import { Card, Ground } from '@/components/surfaces';
 import { Fonts, MaxContentWidth, Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -24,6 +26,12 @@ function leave(): void {
 
 export default function ProfileScreen() {
   const theme = useTheme();
+  // The ground drifts against this, so scrolling reads as a near plane moving
+  // over a far one rather than content sliding on a flat colour.
+  const scrolled = useSharedValue(0);
+  const onScroll = useAnimatedScrollHandler((event) => {
+    scrolled.value = event.contentOffset.y;
+  });
   const { session, profile, saveProfile, signOut } = useAuth();
 
   const [name, setName] = useState(profile?.displayName ?? '');
@@ -64,7 +72,7 @@ export default function ProfileScreen() {
   };
 
   return (
-    <Ground>
+    <Ground scroll={scrolled}>
       <SafeAreaView style={styles.frame}>
         <View style={styles.topBar}>
           <Pressable onPress={leave} accessibilityRole="button" style={styles.leave}>
@@ -74,7 +82,10 @@ export default function ProfileScreen() {
           </Pressable>
         </View>
 
-        <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+        <Animated.ScrollView
+          onScroll={onScroll}
+          scrollEventThrottle={16}
+          contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
           <ThemedText type="title" style={[styles.title, { fontFamily: Fonts.serif }]}>
             Your details
           </ThemedText>
@@ -175,7 +186,7 @@ export default function ProfileScreen() {
               Sign out
             </ThemedText>
           </Pressable>
-        </ScrollView>
+        </Animated.ScrollView>
       </SafeAreaView>
     </Ground>
   );

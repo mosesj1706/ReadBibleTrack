@@ -15,6 +15,7 @@ import { useAnimatedRef, useAnimatedScrollHandler, useSharedValue } from 'react-
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { getBook } from '@/bible/canon.ts';
+import { sectionOf } from '@/bible/sections.ts';
 import { formatReference, parseReference } from '@/bible/reference.ts';
 import { fromVerseId } from '@/bible/verse-id.ts';
 import { chapterRange, nextChapter, previousChapter } from '@/bible/versification.ts';
@@ -27,7 +28,7 @@ import { VerseActions } from '@/components/verse-actions';
 import { TranslationPicker } from '@/components/translation-picker';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Fonts, MaxContentWidth, Radius, Spacing, WideBreakpoint } from '@/constants/theme';
+import { Fonts, MaxContentWidth, Radius, SectionColors, Spacing, WideBreakpoint } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { isFullyRead, useProgress } from '@/progress/provider';
 import { usePassage } from '@/scripture/provider';
@@ -151,7 +152,7 @@ export default function ReaderScreen() {
   const markings = <ChapterMarkings range={range} onJump={(id) => setSelected(id)} />;
 
   return (
-    <Ground>
+    <Ground tint={SectionColors[scheme][sectionOf(at.book)]} scroll={scrolled}>
       <Stack.Screen options={{ title }} />
       <SafeAreaView style={styles.frame}>
         <Glass style={styles.topBar}>

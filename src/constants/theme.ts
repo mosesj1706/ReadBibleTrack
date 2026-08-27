@@ -15,9 +15,15 @@ import { Platform } from 'react-native';
 
 export const Colors = {
   light: {
-    /** The gradient ground everything floats over. */
-    background: '#EDF0F4',
-    backgroundTint: '#E2E8F0',
+    /**
+     * The ground everything floats over, as three stops rather than two.
+     * A single blue-grey read as off-white; running cool to warm across the
+     * page gives the empty margins either side of the content something to
+     * be, which on a wide display is most of what you see.
+     */
+    background: '#E7EDF7',
+    backgroundTint: '#EFEAF4',
+    backgroundWarm: '#F6EFE7',
     /** Frosted chrome: palettes, bars, floating panels. */
     glass: 'rgba(255,255,255,0.62)',
     glassBorder: 'rgba(255,255,255,0.75)',
@@ -40,8 +46,9 @@ export const Colors = {
     shadow: '#1B2838',
   },
   dark: {
-    background: '#10151C',
-    backgroundTint: '#161D27',
+    background: '#0D131E',
+    backgroundTint: '#141A28',
+    backgroundWarm: '#1B1622',
     glass: 'rgba(30,38,50,0.58)',
     glassBorder: 'rgba(255,255,255,0.10)',
     backgroundElement: '#1A222D',
