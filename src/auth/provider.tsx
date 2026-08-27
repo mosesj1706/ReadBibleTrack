@@ -23,6 +23,9 @@ export type Profile = {
   readonly id: string;
   readonly displayName: string;
   readonly avatarUrl: string | null;
+  /** Contact details a circle can see. Never used for authentication. */
+  readonly phone: string | null;
+  readonly email: string | null;
 };
 
 type AuthValue = {
@@ -35,6 +38,10 @@ type AuthValue = {
   readonly sendCode: (email: string) => Promise<void>;
   readonly verifyCode: (email: string, code: string) => Promise<void>;
   readonly saveName: (displayName: string) => Promise<void>;
+  readonly saveProfile: (next: {
+    displayName: string;
+    phone?: string | null;
+  }) => Promise<void>;
   readonly signOut: () => Promise<void>;
 };
 
@@ -61,12 +68,20 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
     }
     const { data } = await supabase
       .from('profiles')
-      .select('id, display_name, avatar_url')
+      .select('id, display_name, avatar_url, phone, email')
       .eq('id', userId)
       .maybeSingle();
 
     setProfile(
-      data ? { id: data.id, displayName: data.display_name, avatarUrl: data.avatar_url } : null,
+      data
+        ? {
+            id: data.id,
+            displayName: data.display_name,
+            avatarUrl: data.avatar_url,
+            phone: data.phone ?? null,
+            email: data.email ?? null,
+          }
+        : null,
     );
   }, []);
 
@@ -129,18 +144,31 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
     if (error) throw readable(error, 'That code did not work.');
   }, []);
 
-  const saveName = useCallback(
-    async (displayName: string) => {
+  const saveProfile = useCallback(
+    async (next: { displayName: string; phone?: string | null }) => {
       const id = session?.user.id;
       if (!id) throw new Error('Not signed in.');
 
-      const { error } = await supabase
-        .from('profiles')
-        .upsert({ id, display_name: displayName.trim(), updated_at: new Date().toISOString() });
-      if (error) throw readable(error, 'Could not save that name.');
+      // The address is copied from the account rather than typed, so a circle
+      // only ever sees one that was actually verified.
+      const row: Record<string, unknown> = {
+        id,
+        display_name: next.displayName.trim(),
+        email: session?.user.email ?? null,
+        updated_at: new Date().toISOString(),
+      };
+      if (next.phone !== undefined) row.phone = next.phone?.trim() || null;
+
+      const { error } = await supabase.from('profiles').upsert(row);
+      if (error) throw readable(error, 'Could not save that.');
       await loadProfile(id);
     },
     [session, loadProfile],
+  );
+
+  const saveName = useCallback(
+    (displayName: string) => saveProfile({ displayName }),
+    [saveProfile],
   );
 
   const signOut = useCallback(async () => {
@@ -149,8 +177,18 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
   }, []);
 
   const value = useMemo(
-    () => ({ session, profile, loading, offline, sendCode, verifyCode, saveName, signOut }),
-    [session, profile, loading, offline, sendCode, verifyCode, saveName, signOut],
+    () => ({
+      session,
+      profile,
+      loading,
+      offline,
+      sendCode,
+      verifyCode,
+      saveName,
+      saveProfile,
+      signOut,
+    }),
+    [session, profile, loading, offline, sendCode, verifyCode, saveName, saveProfile, signOut],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

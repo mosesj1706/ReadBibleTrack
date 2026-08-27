@@ -14,6 +14,7 @@ import { Link, usePathname } from 'expo-router';
 import { Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { Glass } from '@/components/surfaces';
 import { ThemedText } from '@/components/themed-text';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -26,6 +27,7 @@ const DESTINATIONS = [
   { href: '/progress', label: 'Read' },
   { href: '/marked', label: 'Marked' },
   { href: '/circle', label: 'Circle' },
+  { href: '/profile', label: 'You' },
 ] as const;
 
 /** Screens that own the whole window. */
@@ -84,7 +86,7 @@ export function AppNavigation({ children }: { readonly children: React.ReactNode
     return (
       <View style={styles.wideOuter}>
         <View style={styles.wideInner}>
-          <View style={[styles.rail, { borderRightColor: theme.border }]}>{items}</View>
+          <Glass style={styles.rail}>{items}</Glass>
           <View style={styles.grow}>{children}</View>
         </View>
       </View>
@@ -94,18 +96,15 @@ export function AppNavigation({ children }: { readonly children: React.ReactNode
   return (
     <View style={styles.grow}>
       <View style={styles.grow}>{children}</View>
-      <View
+      <Glass
+        floating
         style={[
           styles.bar,
-          {
-            borderTopColor: theme.border,
-            backgroundColor: theme.background,
-            paddingBottom: Math.max(insets.bottom, Spacing.two),
-          },
+          { paddingBottom: Math.max(insets.bottom, Spacing.two) },
         ]}
       >
         {items}
-      </View>
+      </Glass>
     </View>
   );
 }
@@ -118,10 +117,11 @@ const styles = StyleSheet.create({
   wideInner: { flex: 1, flexDirection: 'row', maxWidth: 176 + MaxContentWidth + Spacing.six },
   rail: {
     width: 176,
-    paddingTop: Spacing.six,
+    paddingTop: Spacing.four,
     paddingHorizontal: Spacing.two,
     gap: Spacing.half,
-    borderRightWidth: StyleSheet.hairlineWidth,
+    marginVertical: Spacing.three,
+    marginLeft: Spacing.three,
   },
   railItem: {
     minHeight: 44,
@@ -133,8 +133,9 @@ const styles = StyleSheet.create({
   },
   bar: {
     flexDirection: 'row',
-    borderTopWidth: StyleSheet.hairlineWidth,
     paddingTop: Spacing.one,
+    marginHorizontal: Spacing.two,
+    marginBottom: Spacing.two,
   },
   barItem: {
     flex: 1,

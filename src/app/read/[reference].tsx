@@ -9,19 +9,22 @@
 
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { getBook } from '@/bible/canon.ts';
 import { formatReference, parseReference } from '@/bible/reference.ts';
 import { fromVerseId } from '@/bible/verse-id.ts';
 import { chapterRange, nextChapter, previousChapter } from '@/bible/versification.ts';
+import { ChapterMarkings } from '@/components/chapter-markings';
+import { PassagePalette } from '@/components/passage-palette';
 import { ScriptureText } from '@/components/scripture-text';
+import { Glass, Ground, Page } from '@/components/surfaces';
 import { VerseActions } from '@/components/verse-actions';
 import { TranslationPicker } from '@/components/translation-picker';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Fonts, MaxContentWidth, Spacing } from '@/constants/theme';
+import { Fonts, MaxContentWidth, Radius, Spacing, WideBreakpoint } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { isFullyRead, useProgress } from '@/progress/provider';
 import { usePassage } from '@/scripture/provider';
@@ -30,6 +33,12 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 
 function open(reference: string): void {
   router.replace({ pathname: '/read/[reference]', params: { reference } });
+}
+
+/** Jump from the palette: a book and chapter, optionally a verse within it. */
+function goTo(book: number, chapter: number, verse?: number): void {
+  const name = getBook(book)?.name ?? 'Genesis';
+  open(verse ? `${name} ${chapter}:${verse}` : `${name} ${chapter}`);
 }
 
 /**
@@ -55,6 +64,12 @@ export default function ReaderScreen() {
 
   const passage = usePassage(range);
   const read = isFullyRead(range, ranges);
+
+  const { width } = useWindowDimensions();
+  const wide = width >= WideBreakpoint;
+  // On a narrow screen the panels become one drawer at a time, because two
+  // columns beside a reading measure leaves nothing for the reading.
+  const [drawer, setDrawer] = useState<'none' | 'palette' | 'marks'>('none');
 
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const { marks, notes: written } = useMarks();
@@ -87,10 +102,15 @@ export default function ReaderScreen() {
     );
   }
 
+  const palette = (
+    <PassagePalette book={at.book} chapter={at.chapter} onPick={(b, c, v) => { setDrawer('none'); goTo(b, c, v); }} />
+  );
+  const markings = <ChapterMarkings range={range} onJump={(id) => setSelected(id)} />;
+
   return (
-    <ThemedView style={styles.screen}>
+    <Ground>
       <Stack.Screen options={{ title }} />
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={styles.frame}>
         <View style={styles.topBar}>
           <Pressable
             onPress={leave}
@@ -105,8 +125,19 @@ export default function ReaderScreen() {
           {/* Translation belongs here, not on a home screen: it is changed
               while reading, usually to compare a verse. */}
           <TranslationPicker />
+          {!wide ? (
+            <View style={styles.toggles}>
+              <Toggle label="☰" hint="Books and chapters" on={drawer === 'palette'}
+                onPress={() => setDrawer((d) => (d === 'palette' ? 'none' : 'palette'))} />
+              <Toggle label="✎" hint="Marked in this chapter" on={drawer === 'marks'}
+                onPress={() => setDrawer((d) => (d === 'marks' ? 'none' : 'marks'))} />
+            </View>
+          ) : null}
         </View>
 
+        <View style={styles.columns}>
+        {wide ? <Glass style={styles.side}>{palette}</Glass> : null}
+        <View style={styles.middle}>
         <View style={[styles.bar, { borderBottomColor: theme.border }]}>
           <Step
             label="‹"
@@ -129,6 +160,7 @@ export default function ReaderScreen() {
           />
         </View>
 
+        <Page style={styles.pageFill}>
         <ScrollView contentContainerStyle={styles.text} showsVerticalScrollIndicator={false}>
           <ScriptureText
             verses={passage.verses}
@@ -159,6 +191,19 @@ export default function ReaderScreen() {
             </ThemedText>
           </Pressable>
         </ScrollView>
+        </Page>
+        </View>
+        {wide ? <Glass style={styles.side}>{markings}</Glass> : null}
+        </View>
+
+        {/* One drawer at a time on a narrow screen. */}
+        {!wide && drawer !== 'none' ? (
+          <View style={styles.drawer} pointerEvents="box-none">
+            <Glass floating style={styles.drawerPanel}>
+              {drawer === 'palette' ? palette : markings}
+            </Glass>
+          </View>
+        ) : null}
 
         {/* Pinned rather than in the scroll: the sheet belongs to the verse you
             just tapped, and hunting for it at the end of a 176-verse chapter is
@@ -169,7 +214,35 @@ export default function ReaderScreen() {
           </View>
         ) : null}
       </SafeAreaView>
-    </ThemedView>
+    </Ground>
+  );
+}
+
+function Toggle({
+  label,
+  hint,
+  on,
+  onPress,
+}: {
+  readonly label: string;
+  readonly hint: string;
+  readonly on: boolean;
+  readonly onPress: () => void;
+}) {
+  const theme = useTheme();
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={hint}
+      accessibilityState={{ selected: on }}
+      style={[
+        styles.toggle,
+        { backgroundColor: on ? theme.accentSoft : 'transparent', borderColor: on ? theme.accent : theme.border },
+      ]}
+    >
+      <ThemedText type="small" themeColor={on ? 'accent' : 'textSecondary'}>{label}</ThemedText>
+    </Pressable>
   );
 }
 
@@ -201,6 +274,34 @@ function Step({
 const styles = StyleSheet.create({
   screen: { flex: 1, flexDirection: 'row', justifyContent: 'center' },
   container: { flex: 1, width: '100%', maxWidth: MaxContentWidth },
+  frame: { flex: 1, width: '100%' },
+  // Every link in this chain needs to be allowed to shrink. Without it the
+  // middle column grows to the height of the whole chapter and the scroll
+  // never happens inside it — the header ends up above the top of the window.
+  columns: {
+    flex: 1,
+    minHeight: 0,
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    gap: Spacing.three,
+    paddingHorizontal: Spacing.three,
+  },
+  // Wide enough for a book name and a grid of chapter numbers, narrow enough
+  // that the reading measure keeps the middle.
+  side: { width: 248, minHeight: 0, marginBottom: Spacing.three },
+  middle: { flex: 1, minHeight: 0, maxWidth: MaxContentWidth, width: '100%', overflow: 'hidden' },
+  pageFill: { flex: 1, minHeight: 0, marginBottom: Spacing.three },
+  toggles: { flexDirection: 'row', gap: Spacing.one },
+  toggle: {
+    minWidth: 44,
+    minHeight: 44,
+    borderRadius: Radius.pill,
+    borderWidth: StyleSheet.hairlineWidth,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  drawer: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, padding: Spacing.three },
+  drawerPanel: { flex: 1 },
   bar: {
     flexDirection: 'row',
     alignItems: 'center',

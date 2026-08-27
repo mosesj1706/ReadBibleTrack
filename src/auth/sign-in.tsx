@@ -1,5 +1,11 @@
 /**
- * Signing in: an email address, then a six-digit code.
+ * Signing in: an email address, then the code that arrives.
+ *
+ * The code's length is not ours to decide — it is a server setting, and a
+ * hosted project does not have to match whatever the local stack is
+ * configured for. Accept a range rather than baking a number into the input,
+ * or a project with a different setting produces a field that silently refuses
+ * the very code it just issued.
  *
  * No password to invent or forget, and no link to tap — which matters, because
  * getting a link to open the right app on the right device is the part that
@@ -16,6 +22,10 @@ import { Fonts, MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
 import { useAuth } from './provider';
+
+/** Supabase issues six by default and can be configured longer. */
+const CODE_MIN = 6;
+const CODE_MAX = 10;
 
 export function SignInScreen() {
   const theme = useTheme();
@@ -46,7 +56,15 @@ export function SignInScreen() {
       await work();
       onDone?.();
     } catch (error) {
-      setProblem(error instanceof Error ? error.message : 'Something went wrong.');
+      const raw = error instanceof Error ? error.message : 'Something went wrong.';
+      setProblem(
+        /rate limit|too many/i.test(raw)
+          ? 'Too many codes requested. Wait a few minutes — or if one already reached you, enter it below.'
+          : raw,
+      );
+      // A code sent earlier is still good, so being unable to send another
+      // must not trap someone on this screen with nowhere to type it.
+      if (/rate limit|too many/i.test(raw)) setStage('code');
     } finally {
       setBusy(false);
     }
@@ -70,7 +88,7 @@ export function SignInScreen() {
           </ThemedText>
           <ThemedText themeColor="textSecondary" style={styles.blurb}>
             {stage === 'email'
-              ? 'Your email address is all we need. We’ll send a six-digit code — there’s no password to remember.'
+              ? 'Your email address is all we need. We’ll send a short code — there’s no password to remember.'
               : `We sent a code to ${email.trim()}. It’s good for an hour.`}
           </ThemedText>
         </View>
@@ -101,6 +119,19 @@ export function SignInScreen() {
               disabled={!looksLikeEmail}
               onPress={() => attempt(() => sendCode(email), () => setStage('code'))}
             />
+            <Pressable
+              onPress={() => {
+                setProblem(undefined);
+                setStage('code');
+              }}
+              disabled={!looksLikeEmail}
+              accessibilityRole="button"
+              style={styles.already}
+            >
+              <ThemedText type="small" themeColor={looksLikeEmail ? 'accent' : 'textFaint'}>
+                I already have a code
+              </ThemedText>
+            </Pressable>
           </View>
         ) : (
           <View style={styles.form}>
@@ -108,8 +139,8 @@ export function SignInScreen() {
               ref={codeField}
               style={[styles.input, styles.codeInput, field]}
               value={code}
-              onChangeText={(next) => setCode(next.replace(/\D/g, '').slice(0, 6))}
-              placeholder="000000"
+              onChangeText={(next) => setCode(next.replace(/\D/g, '').slice(0, CODE_MAX))}
+              placeholder="––––––"
               placeholderTextColor={theme.textFaint}
               inputMode="numeric"
               keyboardType="number-pad"
@@ -118,12 +149,12 @@ export function SignInScreen() {
               editable={!busy}
               autoFocus
               returnKeyType="go"
-              onSubmitEditing={() => code.length === 6 && attempt(() => verifyCode(email, code))}
+              onSubmitEditing={() => code.length >= CODE_MIN && attempt(() => verifyCode(email, code))}
             />
             <Action
               label="Sign in"
               busy={busy}
-              disabled={code.length !== 6}
+              disabled={code.length < CODE_MIN}
               onPress={() => attempt(() => verifyCode(email, code))}
             />
             <Pressable
@@ -236,5 +267,6 @@ const styles = StyleSheet.create({
     minHeight: 48,
   },
   back: { textAlign: 'center' },
+  already: { minHeight: 44, alignItems: 'center', justifyContent: 'center' },
   problem: { borderLeftWidth: 2, paddingLeft: Spacing.three },
 });
