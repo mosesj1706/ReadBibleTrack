@@ -12,7 +12,7 @@ import { ScrollView, StyleSheet, View } from 'react-native';
 
 import { BOOKS, getBook } from '@/bible/canon.ts';
 import { SECTIONS, sectionOf } from '@/bible/sections.ts';
-import { lastVerse, verseCounts } from '@/bible/versification.ts';
+import { lastVerse } from '@/bible/versification.ts';
 import { Tappable } from '@/components/motion';
 import { ThemedText } from '@/components/themed-text';
 import { Fonts, Radius, SectionColors, Spacing } from '@/constants/theme';

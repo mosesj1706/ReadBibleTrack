@@ -8,7 +8,7 @@
  */
 
 import { Link, router } from 'expo-router';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { useAnimatedScrollHandler, useSharedValue } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -36,7 +36,6 @@ function leave(): void {
 }
 
 export default function ProgressScreen() {
-  const theme = useTheme();
   // The ground drifts against this, so scrolling reads as a near plane moving
   // over a far one rather than content sliding on a flat colour.
   const scrolled = useSharedValue(0);

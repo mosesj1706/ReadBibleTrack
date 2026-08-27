@@ -69,7 +69,7 @@ export function Ground({
 
   return (
     <View style={[styles.fill, { backgroundColor: theme.background }, style]}>
-      <Animated.View pointerEvents="none" style={[styles.drift, drift]}>
+      <Animated.View style={[styles.drift, { pointerEvents: 'none' }, drift]}>
         <LinearGradient
           colors={[theme.background, theme.backgroundTint, theme.backgroundWarm]}
           locations={[0, 0.55, 1]}

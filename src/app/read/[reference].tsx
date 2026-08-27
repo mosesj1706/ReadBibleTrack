@@ -8,7 +8,7 @@
  */
 
 import { Stack, router, useLocalSearchParams } from 'expo-router';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
 import type { ScrollView } from 'react-native';
 import { useAnimatedRef, useAnimatedScrollHandler, useSharedValue } from 'react-native-reanimated';
@@ -100,20 +100,22 @@ export default function ReaderScreen() {
     jumped.current = undefined;
   }, [at.book, at.chapter]);
 
-  const jumpIfReady = useCallback(
-    (id: number, y: number) => {
-      offsets.current.set(id, y);
-      if (wanted === undefined || jumped.current === wanted || id !== wanted) return;
-      jumped.current = wanted;
-      // Sits the verse a little below the chapter bar rather than flush
-      // against it, so it reads as the top of a passage, not a cut-off one.
-      scroller.current?.scrollTo({ y: Math.max(y - Spacing.four, 0), animated: true });
-      // Deliberately not selected: asking to go to a verse is navigation, and
-      // opening the mark-and-note sheet over half the screen answers a
-      // question nobody asked. Landing at the top of the view says enough.
-    },
-    [wanted, scroller],
-  );
+  // Plain function, not useCallback: this app builds with the React Compiler
+  // (app.json, experiments.reactCompiler), and a manual memo it cannot prove
+  // equivalent makes it skip optimising the whole component. Here it did
+  // exactly that to the reader, which is the last screen worth deoptimising.
+  // The compiler memoises this itself.
+  const jumpIfReady = (id: number, y: number) => {
+    offsets.current.set(id, y);
+    if (wanted === undefined || jumped.current === wanted || id !== wanted) return;
+    jumped.current = wanted;
+    // Sits the verse a little below the chapter bar rather than flush against
+    // it, so it reads as the top of a passage, not a cut-off one.
+    scroller.current?.scrollTo({ y: Math.max(y - Spacing.four, 0), animated: true });
+    // Deliberately not selected: asking to go to a verse is navigation, and
+    // opening the mark-and-note sheet over half the screen answers a question
+    // nobody asked. Landing at the top of the view says enough.
+  };
 
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const { marks, notes: written } = useMarks();
@@ -249,7 +251,7 @@ export default function ReaderScreen() {
 
         {/* One drawer at a time on a narrow screen. */}
         {!wide && drawer !== 'none' ? (
-          <View style={styles.drawer} pointerEvents="box-none">
+          <View style={[styles.drawer, { pointerEvents: 'box-none' }]}>
             <SlideIn
               visible
               fromX={drawer === 'palette' ? -40 : 40}
@@ -266,7 +268,7 @@ export default function ReaderScreen() {
             just tapped, and hunting for it at the end of a 176-verse chapter is
             not an interaction. */}
         {selected !== undefined ? (
-          <View style={styles.sheetHolder} pointerEvents="box-none">
+          <View style={[styles.sheetHolder, { pointerEvents: 'box-none' }]}>
             <SlideIn visible fromY={28}>
               <VerseActions verseId={selected} onClose={() => setSelected(undefined)} />
             </SlideIn>

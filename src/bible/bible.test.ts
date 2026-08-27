@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
 
-import { BOOKS, findBook, getBook } from './canon.ts';
+import { BOOKS, findBook } from './canon.ts';
 import { formatReference, parseReference } from './reference.ts';
 import {
   bookSpan,

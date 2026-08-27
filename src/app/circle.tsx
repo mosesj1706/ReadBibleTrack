@@ -7,16 +7,7 @@
 
 import { router } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import {
-  ActivityIndicator,
-  Pressable,
-  ScrollView,
-  Share,
-  StyleSheet,
-  TextInput,
-  View,
-  useWindowDimensions,
-} from 'react-native';
+import { ActivityIndicator, Pressable, Share, StyleSheet, TextInput, View, useWindowDimensions } from 'react-native';
 import { useAnimatedScrollHandler, useSharedValue } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -72,7 +63,6 @@ export default function CircleScreen() {
   const [code, setCode] = useState('');
 
   const load = useCallback(async () => {
-    setProblem(undefined);
     try {
       const circles = await myCircles();
       const first = circles[0];
@@ -85,6 +75,11 @@ export default function CircleScreen() {
         setMembers([]);
         setReading([]);
       }
+      // Cleared once the load has actually worked, not on the way in. Blanking
+      // it first meant a failing reload flashed the old error away and then
+      // put it straight back, and made this a synchronous state write inside
+      // the mount effect that calls it.
+      setProblem(undefined);
     } catch (error) {
       setProblem(error instanceof Error ? error.message : 'Could not load your circle.');
     } finally {
@@ -93,6 +88,10 @@ export default function CircleScreen() {
   }, []);
 
   useEffect(() => {
+    // `load` awaits before it touches any state, so nothing here is a
+    // synchronous render-triggering write — the rule cannot see past the call
+    // boundary. Fetching on mount is what an effect is for.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void load();
   }, [load]);
 

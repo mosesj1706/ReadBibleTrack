@@ -17,7 +17,7 @@ import { ThemedText } from '@/components/themed-text';
 import { Fonts, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useMarks, MARK_TINTS } from '@/marks/provider';
-import { MARK_COLOURS, type MarkColour } from '@/marks/store';
+import { MARK_COLOURS } from '@/marks/store';
 import { useProgress } from '@/progress/provider';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 

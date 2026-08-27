@@ -7,8 +7,8 @@
  */
 
 import { router } from 'expo-router';
-import { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { useState } from 'react';
+import { ActivityIndicator, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { useAnimatedScrollHandler, useSharedValue } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -40,10 +40,15 @@ export default function ProfileScreen() {
   const [problem, setProblem] = useState<string | undefined>();
   const [saved, setSaved] = useState(false);
 
-  useEffect(() => {
+  // Adjusted during render rather than in an effect. An effect would paint
+  // the old profile's values once and then correct them, and React re-runs
+  // this immediately without showing the intermediate state.
+  const [lastProfile, setLastProfile] = useState(profile);
+  if (profile !== lastProfile) {
+    setLastProfile(profile);
     setName(profile?.displayName ?? '');
     setPhone(profile?.phone ?? '');
-  }, [profile]);
+  }
 
   const email = session?.user.email ?? '';
   const nameOk = name.trim().length > 0 && name.trim().length <= 60;

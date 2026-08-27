@@ -170,14 +170,21 @@ export function ScriptureText({
   const theme = useTheme();
 
   // Notes are numbered once across the whole passage, the way a printed page
-  // numbers them, so each verse needs to know where its own run starts.
-  let running = 0;
-  const numbered = verses.map((verse) => {
-    const mine = notes.filter((note) => note.verseId === verse.id);
-    const firstNote = running;
-    running += mine.length;
-    return { verse, mine, firstNote };
-  });
+  // numbers them, so each verse needs to know where its own run starts: after
+  // every note belonging to a verse before it.
+  //
+  // Counted rather than accumulated into a running total. Reassigning a
+  // variable across a map during render is something the React Compiler
+  // cannot follow, and it will decline to optimise the component rather than
+  // risk it.
+  const perVerse = verses.map((verse) => notes.filter((note) => note.verseId === verse.id));
+  const numbered = verses.map((verse, index) => ({
+    verse,
+    mine: perVerse[index],
+    firstNote: perVerse
+      .slice(0, index)
+      .reduce((total, list) => total + list.length, 0),
+  }));
 
   return (
     <View>

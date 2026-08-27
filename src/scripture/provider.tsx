@@ -203,25 +203,35 @@ const EMPTY: Passage = { verses: [], headings: new Map(), notes: [], loading: fa
  */
 export function usePassage(range: VerseRange | undefined): Passage {
   const db = useContext(DatabaseContext);
-  const [passage, setPassage] = useState<Passage>(EMPTY);
   const start = range?.start;
   const end = range?.end;
 
+  // What was last read, and what it was read for. Keeping the bounds beside
+  // the result is what lets "still loading" be derived rather than stored: if
+  // the answer on hand was fetched for different bounds, it is stale by
+  // definition. Setting a loading flag from inside the effect instead would
+  // be a synchronous render-triggering write, which is both a cascading
+  // render and something the React Compiler will not optimise around.
+  const [result, setResult] = useState<{
+    readonly db?: SQLiteDatabase;
+    readonly start?: number;
+    readonly end?: number;
+    readonly passage: Passage;
+  }>({ passage: EMPTY });
+
   useEffect(() => {
-    if (!db || start === undefined || end === undefined) {
-      setPassage(EMPTY);
-      return;
-    }
+    if (!db || start === undefined || end === undefined) return;
     let cancelled = false;
-    setPassage((current) => ({ ...current, loading: true }));
 
     const bounds = { start, end };
     Promise.all([readRange(db, bounds), readHeadings(db, bounds), readNotes(db, bounds)]).then(
       ([verses, headings, notes]) => {
-        if (!cancelled) setPassage({ verses, headings, notes, loading: false });
+        if (!cancelled) {
+          setResult({ db, start, end, passage: { verses, headings, notes, loading: false } });
+        }
       },
       () => {
-        if (!cancelled) setPassage(EMPTY);
+        if (!cancelled) setResult({ db, start, end, passage: EMPTY });
       },
     );
 
@@ -230,5 +240,11 @@ export function usePassage(range: VerseRange | undefined): Passage {
     };
   }, [db, start, end]);
 
-  return passage;
+  if (!db || start === undefined || end === undefined) return EMPTY;
+
+  const fresh = result.db === db && result.start === start && result.end === end;
+  // Until the new bounds arrive, the previous passage stays on screen marked
+  // loading — the same as before. Blanking the page between two chapters
+  // reads as a fault rather than as work in progress.
+  return fresh ? result.passage : { ...result.passage, loading: true };
 }

@@ -18,6 +18,20 @@ before writing Expo code — the API has moved a lot.
 executes TypeScript directly, so there is no Jest, no Babel step and no
 transform config. Keep it that way.
 
+## Lint
+
+`npm run lint` is `expo lint`, with the React Compiler's rules switched on —
+`app.json` sets `experiments.reactCompiler`, so a manual `useCallback` or
+`useMemo` the compiler cannot prove equivalent makes it decline to optimise
+the *whole component*. It reports that as "Compilation Skipped". Prefer plain
+functions and let the compiler memoise; reach for a manual memo only when
+there is a measured reason.
+
+The same rules reject setting state synchronously inside an effect. Where the
+value can be derived instead, derive it — `usePassage` works out "still
+loading" by comparing the bounds it holds against the bounds it was asked
+for, rather than storing a flag.
+
 ## Supabase
 
 `npm run test:rls` needs a local stack (`npx supabase start`) and is deliberately
