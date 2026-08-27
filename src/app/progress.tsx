@@ -11,7 +11,8 @@ import { Link, router } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { BOOKS, type Testament } from '@/bible/canon.ts';
+import { BOOKS } from '@/bible/canon.ts';
+import { SECTIONS } from '@/bible/sections.ts';
 import { canonSpan } from '@/bible/verse-id.ts';
 import {
   TOTAL_VERSES,
@@ -23,7 +24,8 @@ import {
 import { Card, Ground } from '@/components/surfaces';
 import { Animated, Rise, useFill } from '@/components/motion';
 import { ThemedText } from '@/components/themed-text';
-import { Fonts, MaxPageWidth, Spacing } from '@/constants/theme';
+import { Fonts, MaxPageWidth, SectionColors, Spacing } from '@/constants/theme';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useTheme } from '@/hooks/use-theme';
 import { useProgress } from '@/progress/provider';
 
@@ -44,10 +46,7 @@ export default function ProgressScreen() {
   // so every book past ~150 verses came out identical.
   const longest = Math.max(...BOOKS.map((book) => bookVerseTotal(book.number)));
 
-  const testaments: { key: Testament; name: string }[] = [
-    { key: 'old', name: 'Old Testament' },
-    { key: 'new', name: 'New Testament' },
-  ];
+  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
 
   return (
     <Ground style={styles.screen}>
@@ -77,8 +76,11 @@ export default function ProgressScreen() {
           </Card>
           </Rise>
 
-          {testaments.map((testament) => {
-            const books = BOOKS.filter((book) => book.testament === testament.key);
+          {SECTIONS.map((section) => {
+            const hue = SectionColors[scheme][section.key];
+            const books = BOOKS.filter(
+              (book) => book.number >= section.first && book.number <= section.last,
+            );
             const covered = books.reduce(
               (total, book) => total + countVerses([bookRange(book.number)!]),
               0,
@@ -90,10 +92,13 @@ export default function ProgressScreen() {
             );
 
             return (
-              <View key={testament.key} style={styles.section}>
-                <ThemedText type="small" themeColor="textFaint" style={styles.eyebrow}>
-                  {testament.name} · {Math.round((doneHere / covered) * 100)}%
-                </ThemedText>
+              <View key={section.key} style={styles.section}>
+                <View style={styles.sectionHead}>
+                  <View style={[styles.swatch, { backgroundColor: hue }]} />
+                  <ThemedText type="small" style={[styles.eyebrow, { color: hue }]}>
+                    {section.name} · {Math.round((doneHere / covered) * 100)}%
+                  </ThemedText>
+                </View>
 
                 <View style={styles.books}>
                 {books.map((book) => {
@@ -118,7 +123,7 @@ export default function ProgressScreen() {
                             picture is honest about how much Psalms is. */}
                         <View style={styles.trackArea}>
                           <View style={{ width: `${Math.max(3, (total / longest) * 100)}%` }}>
-                            <Bar fraction={share} />
+                            <Bar fraction={share} tint={hue} />
                           </View>
                         </View>
                         <ThemedText type="small" themeColor="textFaint" style={styles.percent}>
@@ -138,17 +143,22 @@ export default function ProgressScreen() {
   );
 }
 
-function Bar({ fraction }: { readonly fraction: number }) {
+function Bar({ fraction, tint }: { readonly fraction: number; readonly tint?: string }) {
   const theme = useTheme();
   const filled = Math.max(0, Math.min(1, fraction));
   const fill = useFill(filled);
+  // The empty part of the track carries the section's colour at low opacity,
+  // so a book reads as belonging to the Torah or the Gospels even when none of
+  // it has been read yet. Without it every unread book is the same grey and
+  // the colour only survives in the headings.
+  const track = tint ? `${tint}24` : theme.backgroundSelected;
   return (
-    <View style={[styles.bar, { backgroundColor: theme.backgroundSelected }]}>
+    <View style={[styles.bar, { backgroundColor: track }]}>
       <Animated.View
         style={[
           {
             height: '100%',
-            backgroundColor: theme.accent,
+            backgroundColor: tint ?? theme.accent,
             opacity: filled === 1 ? 1 : 0.75,
             borderRadius: 3,
           },
@@ -168,7 +178,14 @@ const styles = StyleSheet.create({
   title: { fontSize: 34, lineHeight: 40, fontWeight: '400' },
   summary: { padding: Spacing.four, gap: Spacing.two },
   section: { gap: Spacing.half, marginTop: Spacing.two },
-  eyebrow: { textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: Spacing.two },
+  eyebrow: { textTransform: 'uppercase', letterSpacing: 1.2 },
+  sectionHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
+    marginBottom: Spacing.two,
+  },
+  swatch: { width: 10, height: 10, borderRadius: 5 },
   // Sixty-six books in one column is a very long scroll and, on a desktop,
   // a narrow ribbon of content with the display empty either side. They flow
   // into as many columns as the width allows instead — three on a monitor,

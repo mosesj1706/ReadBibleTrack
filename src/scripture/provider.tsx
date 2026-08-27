@@ -9,7 +9,11 @@
  * expo-sqlite and so costs no extra dependency.
  */
 
-import { SQLiteProvider, useSQLiteContext } from 'expo-sqlite';
+import {
+  importDatabaseFromAssetAsync,
+  openDatabaseAsync,
+  type SQLiteDatabase,
+} from 'expo-sqlite';
 import Storage from 'expo-sqlite/kv-store';
 import {
   createContext,
@@ -17,6 +21,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from 'react';
@@ -46,6 +51,28 @@ type ScriptureValue = {
 };
 
 const ScriptureContext = createContext<ScriptureValue | undefined>(undefined);
+
+/**
+ * The open database.
+ *
+ * This is ours rather than expo-sqlite's `SQLiteProvider` for one reason:
+ * that provider renders `null` while it opens a file, which unmounts every
+ * child. The router is one of those children, and a navigator that unmounts
+ * loses its history — on the web it is rebuilt from the URL and nobody
+ * notices, but on a phone there is no URL to rebuild from, so changing
+ * translation mid-chapter threw the reader back to Today.
+ *
+ * Here the previous database stays open and mounted until the next one is
+ * ready, so a switch never blanks the tree.
+ *
+ * The cost is `importDatabaseFromAssetAsync`, which expo-sqlite exports but
+ * documents as "exposed only for testing purposes". It is the only way to do
+ * the asset copy that `SQLiteProvider` does internally, and the two steps here
+ * are exactly what `openDatabaseWithInitAsync` does in that file. If an
+ * expo-sqlite upgrade ever removes it, the fix is to vendor the same two calls
+ * — not to go back to wrapping the router in a provider that unmounts it.
+ */
+const DatabaseContext = createContext<SQLiteDatabase | undefined>(undefined);
 
 type Opening = { readonly id: string; readonly forceOverwrite: boolean };
 
@@ -95,29 +122,60 @@ export function ScriptureProvider({ children }: { readonly children: ReactNode }
   const translation = translationOrDefault(id);
   const value = useMemo(() => ({ translation, choose }), [translation, choose]);
 
-  // Opening the wrong database first would only make the reader flicker.
-  if (!opening) return null;
+  const [database, setDatabase] = useState<SQLiteDatabase | undefined>(undefined);
+  // The handle currently handed out, tracked outside state so closing the one
+  // it replaces is not done inside a state updater — React may call an updater
+  // more than once, and closing a database twice is not free of consequence.
+  const open = useRef<SQLiteDatabase | undefined>(undefined);
+
+  useEffect(() => {
+    if (!opening) return;
+    let cancelled = false;
+
+    void (async () => {
+      const name = `${opening.id}.db`;
+      try {
+        await importDatabaseFromAssetAsync(name, {
+          assetId: TRANSLATION_ASSETS[opening.id],
+          forceOverwrite: opening.forceOverwrite,
+        });
+        const next = await openDatabaseAsync(name);
+        if (cancelled) {
+          await next.closeAsync().catch(() => {});
+          return;
+        }
+        // Only record the stamp once the copy is actually in place.
+        try {
+          await Storage.setItem(stampKey(opening.id), translationOrDefault(opening.id).stamp);
+        } catch {
+          // A device that cannot remember it just re-extracts next launch.
+        }
+        // Swap first, then close: a query still in flight against the old
+        // handle fails into usePassage's error path and is re-run against the
+        // new one, which is far better than an unmounted screen.
+        const previous = open.current;
+        open.current = next;
+        setDatabase(next);
+        if (previous) void previous.closeAsync().catch(() => {});
+      } catch {
+        // Leaves whatever was already open in place rather than blanking the
+        // app: the reader keeps working in the previous translation, which is
+        // a far better failure than an empty screen.
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [opening]);
+
+  // Only before the very first database is open. After that a switch is
+  // invisible to everything below.
+  if (!database) return null;
 
   return (
     <ScriptureContext.Provider value={value}>
-      <SQLiteProvider
-        key={`${opening.id}:${opening.forceOverwrite}`}
-        databaseName={`${opening.id}.db`}
-        assetSource={{
-          assetId: TRANSLATION_ASSETS[opening.id],
-          forceOverwrite: opening.forceOverwrite,
-        }}
-        onInit={async () => {
-          // Only record the stamp once the copy is actually in place.
-          try {
-            await Storage.setItem(stampKey(opening.id), translation.stamp);
-          } catch {
-            // A device that cannot remember it just re-extracts next launch.
-          }
-        }}
-      >
-        {children}
-      </SQLiteProvider>
+      <DatabaseContext.Provider value={database}>{children}</DatabaseContext.Provider>
     </ScriptureContext.Provider>
   );
 }
@@ -144,13 +202,13 @@ const EMPTY: Passage = { verses: [], headings: new Map(), notes: [], loading: fa
  * same bounds, so they go out together.
  */
 export function usePassage(range: VerseRange | undefined): Passage {
-  const db = useSQLiteContext();
+  const db = useContext(DatabaseContext);
   const [passage, setPassage] = useState<Passage>(EMPTY);
   const start = range?.start;
   const end = range?.end;
 
   useEffect(() => {
-    if (start === undefined || end === undefined) {
+    if (!db || start === undefined || end === undefined) {
       setPassage(EMPTY);
       return;
     }

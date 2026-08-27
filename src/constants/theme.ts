@@ -64,6 +64,42 @@ export const Colors = {
 export type ThemeColor = keyof typeof Colors.light & keyof typeof Colors.dark;
 
 /**
+ * A colour per division of the canon — the Torah, the Gospels, the prophets.
+ *
+ * Muted on purpose. These sit behind book names and progress bars in long
+ * lists, and a saturated palette at that density stops being information and
+ * becomes noise. Each one has to stay legible against both grounds, so the
+ * dark variants are lifted rather than being the same hue turned down.
+ *
+ * Revelation deliberately shares the red-letter red: it is the one book where
+ * that colour is already the book's own.
+ */
+export const SectionColors = {
+  light: {
+    law: '#B4762A',
+    history: '#A75B43',
+    wisdom: '#6B4E9B',
+    majorProphets: '#2F5C93',
+    minorProphets: '#2C7A6E',
+    gospels: '#2F6B58',
+    acts: '#6B7A2E',
+    letters: '#4A5C7A',
+    revelation: '#9C2B2B',
+  },
+  dark: {
+    law: '#D9A45E',
+    history: '#D08C72',
+    wisdom: '#A98CD8',
+    majorProphets: '#7EA9DC',
+    minorProphets: '#6FC0B0',
+    gospels: '#6FBFA0',
+    acts: '#AEBF6A',
+    letters: '#93A6C4',
+    revelation: '#E08A84',
+  },
+} as const;
+
+/**
  * Depth, as three steps rather than arbitrary shadows.
  *
  * `raised` is a card. `floating` is something over the page — a sheet, a

@@ -11,10 +11,12 @@ import { useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 
 import { BOOKS, getBook } from '@/bible/canon.ts';
+import { SECTIONS, sectionOf } from '@/bible/sections.ts';
 import { lastVerse, verseCounts } from '@/bible/versification.ts';
 import { Tappable } from '@/components/motion';
 import { ThemedText } from '@/components/themed-text';
-import { Fonts, Radius, Spacing } from '@/constants/theme';
+import { Fonts, Radius, SectionColors, Spacing } from '@/constants/theme';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useTheme } from '@/hooks/use-theme';
 
 type Step = 'books' | 'chapters' | 'verses';
@@ -30,6 +32,8 @@ export function PassagePalette({
   readonly onPick: (book: number, chapter: number, verse?: number) => void;
 }) {
   const theme = useTheme();
+  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
+  const hueOf = (bookNumber: number) => SectionColors[scheme][sectionOf(bookNumber)];
   const [step, setStep] = useState<Step>('books');
   const [chosenBook, setChosenBook] = useState(book);
   const [chosenChapter, setChosenChapter] = useState(chapter);
@@ -65,12 +69,22 @@ export function PassagePalette({
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
         {step === 'books' ? (
           <>
-            {(['old', 'new'] as const).map((testament) => (
-              <View key={testament} style={styles.group}>
-                <ThemedText type="small" themeColor="textFaint" style={styles.eyebrow}>
-                  {testament === 'old' ? 'Old Testament' : 'New Testament'}
-                </ThemedText>
-                {BOOKS.filter((b) => b.testament === testament).map((b) => {
+            {SECTIONS.map((section) => (
+              <View key={section.key} style={styles.group}>
+                <View style={styles.sectionHead}>
+                  <View
+                    style={[styles.swatch, { backgroundColor: SectionColors[scheme][section.key] }]}
+                  />
+                  <ThemedText
+                    type="small"
+                    style={[styles.eyebrow, { color: SectionColors[scheme][section.key] }]}
+                  >
+                    {section.name}
+                  </ThemedText>
+                </View>
+                {BOOKS.filter(
+                  (b) => b.number >= section.first && b.number <= section.last,
+                ).map((b) => {
                   const here = b.number === book;
                   return (
                     <Tappable
@@ -89,13 +103,19 @@ export function PassagePalette({
                         here ? { backgroundColor: theme.accentSoft } : undefined,
                       ]}
                     >
-                      <ThemedText
-                        type={here ? 'smallBold' : 'small'}
-                        themeColor={here ? 'accent' : 'text'}
-                        numberOfLines={1}
-                      >
-                        {b.name}
-                      </ThemedText>
+                      <View style={styles.bookLine}>
+                        {/* The spine down the left edge is what makes a long
+                            list scannable: you find the Gospels by colour
+                            before you have read a single name. */}
+                        <View style={[styles.spine, { backgroundColor: hueOf(b.number) }]} />
+                        <ThemedText
+                          type={here ? 'smallBold' : 'small'}
+                          themeColor={here ? 'accent' : 'text'}
+                          numberOfLines={1}
+                        >
+                          {b.name}
+                        </ThemedText>
+                      </View>
                     </Tappable>
                   );
                 })}
@@ -219,6 +239,16 @@ const styles = StyleSheet.create({
   crumb: { minHeight: 44, justifyContent: 'center' },
   scroll: { paddingHorizontal: Spacing.two, paddingBottom: Spacing.four, gap: Spacing.two },
   group: { gap: Spacing.half },
+  sectionHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
+    paddingHorizontal: Spacing.two,
+    paddingTop: Spacing.two,
+  },
+  swatch: { width: 8, height: 8, borderRadius: 4 },
+  bookLine: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
+  spine: { width: 3, height: 18, borderRadius: 2 },
   eyebrow: {
     textTransform: 'uppercase',
     letterSpacing: 1.2,
