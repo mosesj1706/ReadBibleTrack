@@ -11,16 +11,18 @@
  */
 
 import { router, usePathname } from 'expo-router';
+import { useEffect, useRef } from 'react';
+import { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 import { StyleSheet, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { canonSpan } from '@/bible/verse-id.ts';
 import { countVerses, progressThrough } from '@/bible/versification.ts';
-import { Animated, Tappable, useFill } from '@/components/motion';
+import { Animated, Settle, Tappable, useFill } from '@/components/motion';
 import { TABS, slideDirection, type Slide } from '@/navigation/order.ts';
 import { Glass, Ground } from '@/components/surfaces';
 import { ThemedText } from '@/components/themed-text';
-import { Fonts, MaxPageWidth, Spacing } from '@/constants/theme';
+import { Fonts, MaxPageWidth, Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useProgress } from '@/progress/provider';
 
@@ -59,6 +61,40 @@ export function AppNavigation({ children }: { readonly children: React.ReactNode
   const wide = width >= WIDE;
   const hidden = isImmersive(pathname);
 
+  // Where each tab ended up, and where the selection currently is. The
+  // selection is a single shape that travels rather than one that blinks off
+  // here and on over there — which is the whole of what makes an island feel
+  // like one object rather than five.
+  const spots = useRef<Record<string, { x: number; width: number }>>({});
+  const slideX = useSharedValue(0);
+  const slideW = useSharedValue(0);
+  const settled = useRef(false);
+
+  const moveTo = (href: string, immediate = false) => {
+    const spot = spots.current[href];
+    if (!spot) return;
+    if (immediate || !settled.current) {
+      slideX.value = spot.x;
+      slideW.value = spot.width;
+      settled.current = true;
+      return;
+    }
+    slideX.value = withSpring(spot.x, Settle);
+    slideW.value = withSpring(spot.width, Settle);
+  };
+
+  const here = TABS.find((t) => (t.href === '/' ? pathname === '/' : pathname.startsWith(t.href)));
+  useEffect(() => {
+    if (here) moveTo(here.href);
+    // moveTo reads refs and shared values, neither of which are reactive.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [here?.href]);
+
+  const island = useAnimatedStyle(() => ({
+    transform: [{ translateX: slideX.value }],
+    width: slideW.value,
+  }));
+
   const items = TABS.map((destination) => {
     // "/" would otherwise match everything.
     const active =
@@ -67,6 +103,11 @@ export function AppNavigation({ children }: { readonly children: React.ReactNode
     return (
         <Tappable
           key={destination.href}
+          onLayout={(event) => {
+            const { x, width: w } = event.nativeEvent.layout;
+            spots.current[destination.href] = { x, width: w };
+            if (active) moveTo(destination.href);
+          }}
           accessibilityRole="link"
           accessibilityState={{ selected: active }}
           onPress={() => {
@@ -77,19 +118,13 @@ export function AppNavigation({ children }: { readonly children: React.ReactNode
           }}
           style={StyleSheet.flatten([
             wide ? styles.railItem : styles.barItem,
+            // On a phone the travelling capsule marks the selection; the rail
+            // has no such thing, so it keeps a tinted pill of its own.
             active && wide
               ? { backgroundColor: theme.accentSoft, borderRadius: Spacing.two }
               : undefined,
           ])}
         >
-          <View
-            style={[
-              styles.marker,
-              {
-                backgroundColor: active && !wide ? theme.accent : 'transparent',
-              },
-            ]}
-          />
           <ThemedText type={active ? 'smallBold' : 'small'} themeColor={active ? 'accent' : 'textSecondary'}>
             {destination.label}
           </ThemedText>
@@ -132,11 +167,12 @@ export function AppNavigation({ children }: { readonly children: React.ReactNode
       <View style={styles.grow}>{children}</View>
       <Glass
         floating
-        style={[
-          styles.bar,
-          { paddingBottom: Math.max(insets.bottom, Spacing.two) },
-        ]}
+        style={[styles.bar, { marginBottom: Math.max(insets.bottom, Spacing.three) }]}
       >
+        <Animated.View
+          pointerEvents="none"
+          style={[styles.island, { backgroundColor: theme.accentSoft }, island]}
+        />
         {items}
       </Glass>
     </View>
@@ -219,11 +255,24 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: Spacing.two,
   },
+  // A capsule that floats clear of the edges rather than a bar bolted to the
+  // bottom of the screen: inset on every side, fully rounded, and lifted off
+  // the home indicator instead of swallowing it.
   bar: {
     flexDirection: 'row',
-    paddingTop: Spacing.one,
-    marginHorizontal: Spacing.two,
-    marginBottom: Spacing.two,
+    padding: Spacing.one,
+    marginHorizontal: Spacing.four,
+    borderRadius: Radius.pill,
+  },
+  // The travelling selection, behind the labels. Its position and width are
+  // animated, so moving between two tabs of different widths stretches rather
+  // than jumps.
+  island: {
+    position: 'absolute',
+    left: 0,
+    top: Spacing.one,
+    bottom: Spacing.one,
+    borderRadius: Radius.pill,
   },
   barItem: {
     flex: 1,
@@ -232,6 +281,4 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: Spacing.half,
   },
-  // A dot above the label on phones; on the rail the pill does the work.
-  marker: { width: 4, height: 4, borderRadius: 2 },
 });

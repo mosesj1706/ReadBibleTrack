@@ -34,6 +34,10 @@ yarn-error.*
 .env*.local
 # Backups of an env file are still an env file.
 .env*.bak
+# SMTP credentials for `supabase config push`. Deliberately not named
+# .env-anything: Expo pulls every .env* at the root into the bundler graph and
+# then fails trying to parse it as JavaScript.
+.smtp.local
 
 # typescript
 *.tsbuildinfo

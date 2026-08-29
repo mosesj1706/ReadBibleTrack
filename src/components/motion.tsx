@@ -12,7 +12,13 @@
  */
 
 import { useEffect, useState, type ReactNode } from 'react';
-import { AccessibilityInfo, Pressable, type StyleProp, type ViewStyle } from 'react-native';
+import {
+  AccessibilityInfo,
+  Pressable,
+  type LayoutChangeEvent,
+  type StyleProp,
+  type ViewStyle,
+} from 'react-native';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -62,6 +68,7 @@ export function Tappable({
   accessibilityLabel,
   accessibilityRole = 'button',
   accessibilityState,
+  onLayout,
 }: {
   readonly children: ReactNode;
   readonly onPress?: () => void;
@@ -71,6 +78,8 @@ export function Tappable({
   readonly accessibilityLabel?: string;
   readonly accessibilityRole?: 'button' | 'link';
   readonly accessibilityState?: { selected?: boolean; disabled?: boolean; busy?: boolean };
+  /** Where this control ended up, for anything that has to track it. */
+  readonly onLayout?: (event: LayoutChangeEvent) => void;
 }) {
   const reduced = useReducedMotion();
   const pressed = useSharedValue(0);
@@ -88,6 +97,7 @@ export function Tappable({
       accessibilityRole={accessibilityRole}
       accessibilityLabel={accessibilityLabel}
       accessibilityState={accessibilityState}
+      onLayout={onLayout}
       onPressIn={() => {
         if (!reduced) pressed.value = withTiming(1, { duration: 90 });
       }}

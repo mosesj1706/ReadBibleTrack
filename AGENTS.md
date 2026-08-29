@@ -46,10 +46,12 @@ enabled. Both live in `supabase/config.toml` and reach the hosted project
 through `supabase config push`, not through the dashboard — the dashboard and
 this file will fight over the same settings if you use both.
 
-The credentials come from the environment. Keep them in `.env.supabase.local`
-(git-ignored by `.env*.local`) and **not** in `.env.local`, which Expo loads
-into the app bundle; an SMTP key shipped to clients is the ability to send
-mail as you.
+The credentials come from the environment. Keep them in `.smtp.local` —
+git-ignored, and deliberately not named `.env`-anything, because Expo pulls
+every `.env*` at the project root into the bundler graph and then fails trying
+to parse it as JavaScript. They must not go in `.env.local` either, which Expo
+loads into the app bundle; an SMTP key shipped to clients is the ability to
+send mail as you.
 
 `config push` sends the whole file, so read the diff before running it against
 production.
