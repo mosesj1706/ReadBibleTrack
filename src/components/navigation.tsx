@@ -114,7 +114,11 @@ export function AppNavigation({ children }: { readonly children: React.ReactNode
             if (active) return;
             // Set before navigating: the navigator reads it as it pushes.
             pendingDirection = slideDirection(pathname, destination.href);
-            router.navigate(destination.href);
+            // Replace, not push. Tabs are five doors in one room, not a
+            // journey — pushing meant a back gesture retraced whichever order
+            // you had happened to visit them in, so backing out of Today led
+            // to You, then Circle, then Marked, apparently forever.
+            router.replace(destination.href);
           }}
           style={StyleSheet.flatten([
             wide ? styles.railItem : styles.barItem,
@@ -201,7 +205,7 @@ function RailSummary() {
       accessibilityLabel={`${read} verses read, ${(share * 100).toFixed(1)} per cent of the Bible`}
       onPress={() => {
         pendingDirection = slideDirection(pathname, '/progress');
-        router.navigate('/progress');
+        router.replace('/progress');
       }}
       style={styles.summary}
     >
