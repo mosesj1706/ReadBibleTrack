@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { TAB_ORDER, slideDirection, tabIndex } from './order.ts';
+import { TAB_ORDER, slideDirection, tabIndex, exitBelow, routeNamesOf } from './order.ts';
 
 test('a tab to the right arrives from the right', () => {
   assert.equal(slideDirection('/', '/progress'), 'slide_from_right');
@@ -44,4 +44,62 @@ test('somewhere that is not a tab keeps the ordinary forward motion', () => {
 
 test('going nowhere is still forward, not a reversal', () => {
   assert.equal(slideDirection('/marked', '/marked'), 'slide_from_right');
+});
+
+test('leaving the reader returns to the screen the run of chapters sits on', () => {
+  const exit = exitBelow(['progress', 'read/[reference]', 'read/[reference]']);
+  assert.deepEqual(exit, { href: '/progress', label: 'Read' });
+});
+
+test('one chapter deep still names what is underneath', () => {
+  assert.deepEqual(exitBelow(['index', 'read/[reference]']), { href: '/', label: 'Today' });
+});
+
+test('a chapter opened cold has nothing to go back to', () => {
+  assert.equal(exitBelow(['read/[reference]']), undefined);
+});
+
+test('a screen that is not a tab is still somewhere to return to', () => {
+  const exit = exitBelow(['plan', 'read/[reference]']);
+  assert.equal(exit?.href, '/plan');
+  assert.equal(exit?.label, 'Back', 'no tab to borrow a name from');
+});
+
+test('the stack that matters is the innermost one, not the container', () => {
+  // What `useRootNavigationState` actually hands back: a container holding a
+  // single `__root` route, with the real stack nested inside it.
+  const names = routeNamesOf({
+    index: 0,
+    routes: [
+      {
+        name: '__root',
+        state: {
+          index: 1,
+          routes: [{ name: 'progress' }, { name: 'read/[reference]' }],
+        },
+      },
+    ],
+  });
+  assert.deepEqual(names, ['progress', 'read/[reference]']);
+});
+
+test('a stack with nothing nested is returned as it stands', () => {
+  assert.deepEqual(routeNamesOf({ index: 0, routes: [{ name: 'index' }] }), ['index']);
+});
+
+test('no state at all is no screens, not a crash', () => {
+  assert.deepEqual(routeNamesOf(undefined), []);
+});
+
+test('the container alone still finds the book list underneath a chapter', () => {
+  const state = {
+    index: 0,
+    routes: [
+      {
+        name: '__root',
+        state: { index: 1, routes: [{ name: 'progress' }, { name: 'read/[reference]' }] },
+      },
+    ],
+  };
+  assert.deepEqual(exitBelow(routeNamesOf(state)), { href: '/progress', label: 'Read' });
 });

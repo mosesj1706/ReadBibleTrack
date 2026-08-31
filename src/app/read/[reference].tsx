@@ -7,7 +7,8 @@
  * already forgiving about how people write one.
  */
 
-import { Stack, router, useLocalSearchParams, useNavigation } from 'expo-router';
+import { Stack, router, useLocalSearchParams, useNavigation, useRootNavigationState } from 'expo-router';
+import type { Href } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
 import type { ScrollView } from 'react-native';
@@ -16,6 +17,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { getBook } from '@/bible/canon.ts';
 import { sectionOf } from '@/bible/sections.ts';
+import { exitBelow, routeNamesOf } from '@/navigation/order.ts';
 import { formatReference, parseReference } from '@/bible/reference.ts';
 import { fromVerseId } from '@/bible/verse-id.ts';
 import { chapterRange, nextChapter, previousChapter } from '@/bible/versification.ts';
@@ -72,12 +74,17 @@ function goTo(book: number, chapter: number, verse?: number): void {
 /**
  * Leaving the reader entirely, however many chapters deep you are.
  *
- * `dismissAll` rather than `back`, because back now steps one chapter at a
- * time — which is what it should do, and which would make this button take
- * thirty taps after thirty chapters.
+ * `dismissTo` the screen the whole run of chapters sits on, rather than
+ * `back`, because back now steps one chapter at a time — which is what it
+ * should do, and which would make this button take thirty taps after thirty
+ * chapters. Where that screen is comes from `exitBelow`, which is tested; the
+ * previous `canDismiss`/`dismissAll` pair sent everyone to Today no matter
+ * where they had come from.
  */
-function leave(): void {
-  if (router.canDismiss()) router.dismissAll();
+function leave(routeNames: readonly string[]): void {
+  const exit = exitBelow(routeNames);
+  console.log('ROUTENAMES', JSON.stringify(routeNames));
+  if (exit) router.dismissTo(exit.href as Href);
   else router.replace('/');
 }
 
@@ -147,21 +154,42 @@ export default function ReaderScreen() {
   const { marks, notes: written } = useMarks();
   const [selected, setSelected] = useState<number | undefined>();
 
-  // A back gesture should close whatever is open on top of the chapter before
-  // it closes the chapter. The books panel and the verse sheet are overlays
-  // rather than screens, so without this the swipe went straight past them and
-  // out of the reader — you opened the book list, swiped, and landed on Today
-  // having lost your place.
+  // A back gesture should not close the chapter while something is open on
+  // top of it. The books panel and the verse sheet are overlays rather than
+  // screens, so a swipe went straight past them and out of the reader — you
+  // opened the book list, swiped, and landed on Today having lost your place.
   const navigation = useNavigation();
+
+  // Reactive, unlike `navigation.getState()`: the corner has to rename itself
+  // when a chapter is pushed on top of it.
+  const rootState = useRootNavigationState();
+  const routeNames = routeNamesOf(rootState);
+  const exit = exitBelow(routeNames);
+  const overlaid = drawer !== 'none' || selected !== undefined;
+
+  // Android's hardware back closes the overlay instead of the chapter. Only
+  // the chapter actually on screen may hold it: every chapter pushed on the
+  // way here keeps its own listener, and leaving removes them all at once, so
+  // an unfocused one still holding an open panel would cancel the whole thing.
+  //
+  // This deliberately does not try to hold the iOS swipe. That gesture is
+  // driven natively and the screen has already animated away by the time
+  // JavaScript cancels it, which leaves the router believing you are still in
+  // the reader while you are looking at another page — and the tab bar, which
+  // hides itself on `/read`, stays hidden until the app is restarted. The
+  // swipe is turned off instead, below, which is a thing the native side
+  // understands. `gestureEnabled` does not cover the hardware button, which
+  // is why both exist.
   useEffect(() => {
+    if (!overlaid) return;
     const stop = navigation.addListener('beforeRemove', (event) => {
-      if (drawer === 'none' && selected === undefined) return;
+      if (!navigation.isFocused()) return;
       event.preventDefault();
       setDrawer('none');
       setSelected(undefined);
     });
     return stop;
-  }, [navigation, drawer, selected]);
+  }, [navigation, overlaid]);
 
 
   // A verse is marked when a mark's range covers it, so a highlight over
@@ -198,20 +226,25 @@ export default function ReaderScreen() {
 
   return (
     <Ground tint={SectionColors[scheme][sectionOf(at.book)]} scroll={scrolled}>
-      <Stack.Screen options={{ title }} />
+      {/* No swipe while a panel is over the chapter: the gesture would take
+          the whole screen with it, and the panel is what the swipe is aimed
+          at. Refusing it natively is the only way that does not leave the
+          native stack and the router disagreeing about where you are. */}
+      <Stack.Screen options={{ title, gestureEnabled: !overlaid }} />
       <SafeAreaView style={styles.frame}>
         <Glass style={styles.topBar}>
           <Pressable
-            onPress={leave}
+            onPress={() => leave(routeNames)}
             accessibilityRole="button"
-            accessibilityLabel="Back to today"
+            accessibilityLabel={`Back to ${exit?.label ?? 'Today'}`}
             style={styles.leave}
           >
             <ThemedText type="small" themeColor="accent">
-              {/* "Close" rather than "Back": the swipe steps back a chapter,
-                  this leaves the reader. Calling both of them Back would name
-                  two different things the same. */}
-              {router.canDismiss() ? '‹ Close' : '‹ Today'}
+              {/* Named rather than "Back": the swipe steps back a chapter and
+                  this leaves the reader, so calling both of them Back would
+                  name two different things the same. Saying where it lands
+                  also makes it obvious when it is about to land wrongly. */}
+              {`‹ ${exit?.label ?? 'Today'}`}
             </ThemedText>
           </Pressable>
           {/* Translation belongs here, not on a home screen: it is changed
@@ -291,6 +324,32 @@ export default function ReaderScreen() {
               {read ? `✓ ${title} read` : `Mark ${title} read`}
             </ThemedText>
           </Pressable>
+
+          {/* The same two arrows as the header, at the end of the reading.
+              Someone who has just finished a chapter is at the bottom of it,
+              and should not have to scroll back up to carry on. Named, because
+              down here there is room to say where they lead — and because the
+              next one is often the first chapter of another book. */}
+          <View style={styles.onward}>
+            <Onward
+              side="back"
+              reference={previous ? formatReference(chapterRange(previous.book, previous.chapter)!) : undefined}
+              onPress={
+                previous
+                  ? () => open(formatReference(chapterRange(previous.book, previous.chapter)!), 'back')
+                  : undefined
+              }
+            />
+            <Onward
+              side="forward"
+              reference={next ? formatReference(chapterRange(next.book, next.chapter)!) : undefined}
+              onPress={
+                next
+                  ? () => open(formatReference(chapterRange(next.book, next.chapter)!), 'forward')
+                  : undefined
+              }
+            />
+          </View>
         </Animated.ScrollView>
         </Page>
         </View>
@@ -375,6 +434,37 @@ function Step({
     >
       <ThemedText style={{ color: onPress ? theme.accent : theme.textFaint, fontSize: 28 }}>
         {label}
+      </ThemedText>
+    </Pressable>
+  );
+}
+
+/**
+ * A named step at the foot of the chapter.
+ *
+ * Renders nothing at the two ends of the Bible rather than a dead control:
+ * there is no chapter before Genesis 1, and saying so is not worth the space.
+ */
+function Onward({
+  side,
+  reference,
+  onPress,
+}: {
+  readonly side: 'back' | 'forward';
+  readonly reference?: string;
+  readonly onPress?: () => void;
+}) {
+  const theme = useTheme();
+  if (!reference || !onPress) return <View style={styles.onwardGap} />;
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={reference}
+      style={[styles.onwardStep, { borderColor: theme.border }]}
+    >
+      <ThemedText type="smallBold" themeColor="accent" numberOfLines={1}>
+        {side === 'back' ? `\u2039 ${reference}` : `${reference} \u203a`}
       </ThemedText>
     </Pressable>
   );
@@ -479,6 +569,25 @@ const styles = StyleSheet.create({
     right: Spacing.three,
     bottom: Spacing.three,
   },
+  onward: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: Spacing.two,
+    marginTop: Spacing.two,
+  },
+  onwardStep: {
+    flexShrink: 1,
+    paddingVertical: Spacing.two,
+    paddingHorizontal: Spacing.three,
+    borderRadius: Spacing.two,
+    borderWidth: StyleSheet.hairlineWidth,
+    minHeight: 44,
+    justifyContent: 'center',
+  },
+  // Holds the far side in place when there is no chapter that way, so a
+  // lone "next" stays on the right rather than sliding to the left.
+  onwardGap: { flex: 0, width: 1 },
   action: {
     marginTop: Spacing.four,
     paddingVertical: Spacing.three,
