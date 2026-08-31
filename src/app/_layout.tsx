@@ -6,6 +6,7 @@ import { AppNavigation, directionForNextScreen } from '@/components/navigation';
 import { Colors } from '@/constants/theme';
 import { AuthGate } from '@/auth/gate';
 import { AuthProvider } from '@/auth/provider';
+import { CircleProvider } from '@/circles/provider';
 import { MarksProvider } from '@/marks/provider';
 import { PlanProvider } from '@/plans/provider';
 import { ProgressProvider } from '@/progress/provider';
@@ -24,6 +25,7 @@ export default function RootLayout() {
             <ProgressProvider>
               <PlanProvider>
                 <MarksProvider>
+                  <CircleProvider>
                   <AppNavigation>
                     <Stack
                       // A function, not an object: it is evaluated as each
@@ -36,6 +38,7 @@ export default function RootLayout() {
                       })}
                     />
                   </AppNavigation>
+                  </CircleProvider>
                 </MarksProvider>
               </PlanProvider>
             </ProgressProvider>

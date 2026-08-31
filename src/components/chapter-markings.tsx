@@ -14,7 +14,9 @@ import { ThemedText } from '@/components/themed-text';
 import { Fonts, Radius, Spacing } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useTheme } from '@/hooks/use-theme';
+import { useCircle } from '@/circles/provider';
 import { MARK_TINTS, useMarks } from '@/marks/provider';
+import type { MarkColour } from '@/marks/store';
 
 export function ChapterMarkings({
   range,
@@ -27,13 +29,17 @@ export function ChapterMarkings({
   const theme = useTheme();
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const { marks, notes, forgetMark, forgetNote } = useMarks();
+  const { marksIn, notesIn, nameOf, inACircle } = useCircle();
 
   const within = <T extends VerseRange>(items: readonly T[]) =>
     items.filter((item) => item.start <= range.end && item.end >= range.start);
 
   const here = within(marks);
   const written = within(notes);
-  const nothing = here.length === 0 && written.length === 0;
+  const theirs = marksIn(range);
+  const theirNotes = notesIn(range);
+  const nothing =
+    here.length === 0 && written.length === 0 && theirs.length === 0 && theirNotes.length === 0;
 
   return (
     <View style={styles.root}>
@@ -106,6 +112,56 @@ export function ChapterMarkings({
             </View>
           </View>
         ))}
+        {inACircle && (theirs.length > 0 || theirNotes.length > 0) ? (
+          <>
+            <ThemedText type="small" themeColor="textFaint" style={styles.shared}>
+              Shared with you
+            </ThemedText>
+
+            {theirs.map((mark, index) => (
+              <View
+                key={`m${index}`}
+                style={[styles.row, styles.fromThem, { borderColor: theme.border }]}
+              >
+                {mark.colour ? (
+                  <View
+                    style={[
+                      styles.chip,
+                      { backgroundColor: MARK_TINTS[mark.colour as MarkColour][scheme] },
+                    ]}
+                  />
+                ) : (
+                  <ThemedText themeColor="accent">★</ThemedText>
+                )}
+                <View style={styles.grow}>
+                  <ThemedText type="small" style={{ fontFamily: Fonts.serif }}>
+                    {formatReference(mark)}
+                  </ThemedText>
+                  <ThemedText type="small" themeColor="textFaint">
+                    {nameOf(mark.userId) ?? 'Someone'}
+                  </ThemedText>
+                </View>
+              </View>
+            ))}
+
+            {theirNotes.map((note, index) => (
+              <View
+                key={`n${index}`}
+                style={[styles.note, styles.fromThem, { borderColor: theme.border }]}
+              >
+                <ThemedText type="smallBold" themeColor="accent" style={{ fontFamily: Fonts.serif }}>
+                  {formatReference(note)}
+                </ThemedText>
+                <ThemedText type="small" themeColor="textSecondary">
+                  {note.body}
+                </ThemedText>
+                <ThemedText type="small" themeColor="textFaint">
+                  {nameOf(note.userId) ?? 'Someone'}
+                </ThemedText>
+              </View>
+            ))}
+          </>
+        ) : null}
       </ScrollView>
     </View>
   );
@@ -151,4 +207,14 @@ const styles = StyleSheet.create({
   noteMain: { flexGrow: 1, flexShrink: 1, gap: Spacing.half, minHeight: 44 },
   chip: { width: 16, height: 16, borderRadius: 8 },
   remove: { minWidth: 32, minHeight: 32, alignItems: 'center', justifyContent: 'center' },
+  shared: {
+    textTransform: 'uppercase',
+    letterSpacing: 1.2,
+    paddingHorizontal: Spacing.two,
+    paddingTop: Spacing.three,
+  },
+  // Someone else's, and not yours to remove — no × on these, and a dashed
+  // edge so the difference is visible before the name is read.
+  fromThem: { borderStyle: 'dashed' },
+  grow: { flexGrow: 1, flexShrink: 1, gap: Spacing.half },
 });
