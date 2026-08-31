@@ -3,6 +3,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useColorScheme } from 'react-native';
 
 import { AppNavigation, directionForNextScreen } from '@/components/navigation';
+import { animationForRoute } from '@/navigation/order.ts';
 import { Colors } from '@/constants/theme';
 import { AuthGate } from '@/auth/gate';
 import { AuthProvider } from '@/auth/provider';
@@ -31,11 +32,21 @@ export default function RootLayout() {
                   <AppNavigation>
                     <Stack
                       // A function, not an object: it is evaluated as each
-                      // screen is pushed, which is what lets the tab bar decide
-                      // the direction of travel a moment beforehand.
-                      screenOptions={() => ({
+                      // screen is pushed, which is what lets the tab bar
+                      // decide the direction of travel a moment beforehand.
+                      screenOptions={({ route }) => ({
                         headerShown: false,
-                        animation: directionForNextScreen(),
+                        animation: animationForRoute(
+                          route.name,
+                          route.params,
+                          directionForNextScreen(),
+                        ),
+                        // iOS drops the interactive back gesture on a screen
+                        // that arrives with anything but the default
+                        // animation, unless the gesture is told to use that
+                        // animation too. Without this, every chapter opened
+                        // by the back arrow could not be swiped out of.
+                        animationMatchesGesture: true,
                         contentStyle: { backgroundColor: theme.background },
                       })}
                     />

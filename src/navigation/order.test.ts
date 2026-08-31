@@ -1,7 +1,14 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { TAB_ORDER, slideDirection, tabIndex, exitBelow, routeNamesOf } from './order.ts';
+import {
+  TAB_ORDER,
+  animationForRoute,
+  exitBelow,
+  routeNamesOf,
+  slideDirection,
+  tabIndex,
+} from './order.ts';
 
 test('a tab to the right arrives from the right', () => {
   assert.equal(slideDirection('/', '/progress'), 'slide_from_right');
@@ -102,4 +109,25 @@ test('the container alone still finds the book list underneath a chapter', () =>
     ],
   };
   assert.deepEqual(exitBelow(routeNamesOf(state)), { href: '/progress', label: 'Read' });
+});
+
+test('a chapter reached by the back arrow arrives from the left', () => {
+  assert.equal(
+    animationForRoute('read/[reference]', { travel: 'back' }, 'slide_from_right'),
+    'slide_from_left',
+  );
+});
+
+test('a chapter with no direction of its own arrives from the right', () => {
+  // Not the fallback: a screen already on the stack must not have its
+  // animation rewritten by wherever the tabs happen to be pointing.
+  assert.equal(
+    animationForRoute('read/[reference]', undefined, 'slide_from_left'),
+    'slide_from_right',
+  );
+});
+
+test('a tab still follows the direction the bar decided', () => {
+  assert.equal(animationForRoute('marked', undefined, 'slide_from_left'), 'slide_from_left');
+  assert.equal(animationForRoute('index', undefined, 'slide_from_right'), 'slide_from_right');
 });

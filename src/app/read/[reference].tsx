@@ -23,7 +23,7 @@ import { fromVerseId } from '@/bible/verse-id.ts';
 import { chapterRange, nextChapter, previousChapter } from '@/bible/versification.ts';
 import { ChapterMarkings } from '@/components/chapter-markings';
 import { Animated, SlideIn, useCollapse } from '@/components/motion';
-import { setNextDirection } from '@/components/navigation';
+import {  } from '@/components/navigation';
 import { PassagePalette } from '@/components/passage-palette';
 import { ScriptureText } from '@/components/scripture-text';
 import { Glass, Ground, Page } from '@/components/surfaces';
@@ -51,8 +51,14 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
  * retreating through the chapters one at a time.
  */
 function open(reference: string, travelling: 'forward' | 'back' = 'forward'): void {
-  setNextDirection(travelling === 'back' ? 'slide_from_left' : 'slide_from_right');
-  router.push({ pathname: '/read/[reference]', params: { reference } });
+  // The direction rides along with the screen. Setting it on a shared value
+  // left it set: every screen pushed afterwards arrived from the left, and a
+  // screen with a custom entry animation has no iOS back gesture, so one tap
+  // on the back arrow took the swipe away for the rest of the session.
+  router.push({
+    pathname: '/read/[reference]',
+    params: { reference, ...(travelling === 'back' ? { travel: 'back' } : {}) },
+  });
 }
 
 /**
@@ -67,7 +73,6 @@ function open(reference: string, travelling: 'forward' | 'back' = 'forward'): vo
 function goTo(book: number, chapter: number, verse?: number): void {
   const name = getBook(book)?.name ?? 'Genesis';
   const reference = verse ? `${name} ${chapter}:${verse}` : `${name} ${chapter}`;
-  setNextDirection('slide_from_right');
   router.push({ pathname: '/read/[reference]', params: { reference } });
 }
 

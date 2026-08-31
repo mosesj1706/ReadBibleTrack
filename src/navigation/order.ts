@@ -110,3 +110,29 @@ export function routeNamesOf(state: NavState | undefined): readonly string[] {
   }
   return node?.routes.map((route) => route.name) ?? [];
 }
+
+/**
+ * How a screen should arrive.
+ *
+ * The reader carries its direction in its own params rather than reading a
+ * shared value, because chapters are *pushed*: a pushed screen keeps its
+ * options for as long as it sits on the stack, so a shared value let a later
+ * navigation quietly rewrite the animation of a screen already sitting there.
+ *
+ * That mattered more than it looks. The shared value was set and never put
+ * back, so one tap on the previous-chapter arrow left every screen pushed
+ * afterwards arriving from the left — and iOS gives a screen with a custom
+ * entry animation no interactive back gesture unless it is asked to. One tap
+ * took the swipe away for the rest of the session.
+ *
+ * Everything else is replaced rather than pushed and has no back gesture to
+ * lose, so the shared value is still good enough for the tabs.
+ */
+export function animationForRoute(
+  name: string,
+  params: { readonly travel?: unknown } | undefined,
+  fallback: Slide,
+): Slide {
+  if (!name.startsWith('read/')) return fallback;
+  return params?.travel === 'back' ? 'slide_from_left' : 'slide_from_right';
+}
