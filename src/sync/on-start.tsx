@@ -32,7 +32,7 @@ export function SyncOnStart() {
       try {
         const { pulled } = await syncNow();
         // Only disturb the screen if something actually arrived.
-        if (pulled.reading > 0 || pulled.marks > 0 || pulled.notes > 0) {
+        if (pulled.reading > 0 || pulled.marks > 0 || pulled.notes > 0 || pulled.place) {
           refreshProgress();
           refreshMarks();
         }

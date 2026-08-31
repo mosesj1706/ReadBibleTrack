@@ -26,6 +26,12 @@ type ProgressValue = {
   readonly ranges: readonly VerseRange[];
   /** Where reading stopped, so it can be picked up again. */
   readonly bookmark: VerseId | undefined;
+  /**
+   * Where reading stopped, without claiming any of it was read. Moved as
+   * someone reads and by asking outright; the two are the same pointer, so
+   * there is nothing that can disagree with itself.
+   */
+  readonly keepPlace: (verseId: VerseId) => void;
   readonly ready: boolean;
   /** Re-read from the device, after a sync has written to it. */
   readonly refresh: () => void;
@@ -65,6 +71,14 @@ export function ProgressProvider({ children }: { readonly children: ReactNode })
     [refresh],
   );
 
+  const keepPlace = useCallback((verseId: VerseId) => {
+    // Straight to the state as well as the database: this runs on the way out
+    // of a chapter, and a full re-read of every range to learn one number
+    // would be work nobody is waiting for.
+    setBookmark(verseId);
+    void moveBookmark(verseId);
+  }, []);
+
   const unmark = useCallback(
     (range: VerseRange) => {
       void markUnread(range).then(refresh);
@@ -73,8 +87,8 @@ export function ProgressProvider({ children }: { readonly children: ReactNode })
   );
 
   const value = useMemo(
-    () => ({ ranges, bookmark, ready, mark, unmark, refresh: () => void refresh() }),
-    [ranges, bookmark, ready, mark, unmark, refresh],
+    () => ({ ranges, bookmark, ready, mark, unmark, keepPlace, refresh: () => void refresh() }),
+    [ranges, bookmark, ready, mark, unmark, keepPlace, refresh],
   );
 
   return <ProgressContext.Provider value={value}>{children}</ProgressContext.Provider>;

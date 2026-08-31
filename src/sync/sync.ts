@@ -17,7 +17,7 @@
  * so a bug in this file cannot leak someone else's reading.
  */
 
-import { loggedRanges, mergeIn } from '@/progress/store';
+import { loggedRanges, mergeIn, moveBookmark, readBookmarkMoved } from '@/progress/store';
 import { listMarks, listNotes, mergeMarks, mergeNotes } from '@/marks/store';
 import { supabase } from '@/supabase/client';
 
@@ -87,6 +87,22 @@ export async function pushMine(): Promise<SyncResult> {
     if (error) throw new Error(`Could not send notes: ${error.message}`);
   }
 
+  // Upserted rather than cleared and re-inserted like the rest: this is one
+  // row that is a pointer, and deleting it first would leave a moment in which
+  // another device pulling would find no place at all. The pull above has
+  // already taken the server's copy if it was the newer one, so what goes up
+  // here is the later of the two.
+  const place = await readBookmarkMoved();
+  if (place) {
+    const { error } = await supabase
+      .from('reading_place')
+      .upsert(
+        { user_id: userId, verse_id: place.verseId, moved_at: place.movedAt },
+        { onConflict: 'user_id' },
+      );
+    if (error) throw new Error(`Could not send your place: ${error.message}`);
+  }
+
   return { reading: ranges.length, marks: marks.length, notes: notes.length };
 }
 
@@ -102,15 +118,21 @@ export async function pushMine(): Promise<SyncResult> {
  * Hence the order in `syncNow`, which is not an implementation detail: pull,
  * merge, then push. Reversed, it destroys data.
  */
-export async function pullMine(): Promise<{ reading: number; marks: number; notes: number }> {
+export async function pullMine(): Promise<{
+  reading: number;
+  marks: number;
+  notes: number;
+  place: boolean;
+}> {
   const userId = await currentUser();
 
-  const [reading, marks, notes] = await Promise.all([
+  const [reading, marks, notes, place] = await Promise.all([
     supabase.from('reading_log').select('start_id, end_id, read_on').eq('user_id', userId),
     supabase.from('marks').select('start_id, end_id, colour, starred, shared').eq('user_id', userId),
     supabase.from('notes').select('start_id, end_id, body, shared').eq('user_id', userId),
+    supabase.from('reading_place').select('verse_id, moved_at').eq('user_id', userId).maybeSingle(),
   ]);
-  for (const result of [reading, marks, notes]) {
+  for (const result of [reading, marks, notes, place]) {
     if (result.error) throw new Error(`Could not read your own copy: ${result.error.message}`);
   }
 
@@ -139,7 +161,16 @@ export async function pullMine(): Promise<{ reading: number; marks: number; note
     })),
   );
 
-  return { reading: addedReading, marks: addedMarks, notes: addedNotes };
+  // Not a merge. Reading is a union of everything every device knows; a place
+  // is one pointer, and two devices holding different ones are not both right.
+  // The later one is, so a device that has been read on since is not dragged
+  // backwards by one that has been sitting in a drawer.
+  const theirs = place.data as { verse_id: number; moved_at: string } | null;
+  const mine = await readBookmarkMoved();
+  const takePlace = theirs !== null && (mine === undefined || theirs.moved_at > mine.movedAt);
+  if (takePlace) await moveBookmark(theirs.verse_id, theirs.moved_at);
+
+  return { reading: addedReading, marks: addedMarks, notes: addedNotes, place: takePlace };
 }
 
 /**

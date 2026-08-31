@@ -10,14 +10,20 @@
 import { Stack, router, useLocalSearchParams, useNavigation, useRootNavigationState } from 'expo-router';
 import type { Href } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { AppState, Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
 import type { ScrollView } from 'react-native';
-import { useAnimatedRef, useAnimatedScrollHandler, useSharedValue } from 'react-native-reanimated';
+import {
+  runOnJS,
+  useAnimatedRef,
+  useAnimatedScrollHandler,
+  useSharedValue,
+} from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { getBook } from '@/bible/canon.ts';
 import { sectionOf } from '@/bible/sections.ts';
 import { exitBelow, routeNamesOf } from '@/navigation/order.ts';
+import { verseAtTop } from '@/progress/place.ts';
 import { formatReference, parseReference } from '@/bible/reference.ts';
 import { fromVerseId } from '@/bible/verse-id.ts';
 import { chapterRange, nextChapter, previousChapter } from '@/bible/versification.ts';
@@ -95,7 +101,7 @@ function leave(routeNames: readonly string[]): void {
 
 export default function ReaderScreen() {
   const theme = useTheme();
-  const { ranges, mark, unmark } = useProgress();
+  const { ranges, mark, unmark, keepPlace } = useProgress();
   const params = useLocalSearchParams<{ reference: string }>();
 
   // A reference may name any span; the reader shows the chapter it starts in.
@@ -115,9 +121,20 @@ export default function ReaderScreen() {
 
   // How far into the chapter you have read. Kept on the UI thread so the
   // header can fold away without a round trip per frame.
+  // Where each verse was laid out, filled in as they lay out.
+  const offsets = useRef(new Map<number, number>());
+
   const scrolled = useSharedValue(0);
+  // Where the reading got to, reported from the UI thread as it moves. Kept in
+  // a ref rather than written down on every frame: this is one row in a
+  // database and nobody is waiting to read it until the chapter is left.
+  const here = useRef<number | undefined>(undefined);
+  const noteHere = (y: number) => {
+    here.current = verseAtTop(offsets.current, y);
+  };
   const onScroll = useAnimatedScrollHandler((event) => {
     scrolled.value = event.contentOffset.y;
+    runOnJS(noteHere)(event.contentOffset.y);
   });
   const chromeStyle = useCollapse(scrolled, 52);
 
@@ -126,7 +143,6 @@ export default function ReaderScreen() {
   // Verses report their own offsets as they lay out, which happens after the
   // passage loads, so the jump waits for the verse it was asked for.
   const scroller = useAnimatedRef<ScrollView>();
-  const offsets = useRef(new Map<number, number>());
   const wanted = requested && range && requested.start !== range.start
     ? requested.start
     : undefined;
@@ -154,6 +170,27 @@ export default function ReaderScreen() {
     // opening the mark-and-note sheet over half the screen answers a question
     // nobody asked. Landing at the top of the view says enough.
   };
+
+  // Where reading stopped, written down when the chapter is left rather than
+  // as it is read: leaving is the moment the answer is final, and it saves a
+  // database write per scroll.
+  //
+  // Backgrounding counts as leaving. Closing the app in the middle of a
+  // chapter is the ordinary way to stop reading, and it unmounts nothing.
+  useEffect(() => {
+    const keep = () => {
+      // Only if the page moved. Opening a chapter, looking at it and going
+      // back is browsing, and it must not overwrite where you actually were.
+      if (here.current !== undefined) keepPlace(here.current);
+    };
+    const stop = AppState.addEventListener('change', (next) => {
+      if (next !== 'active') keep();
+    });
+    return () => {
+      stop.remove();
+      keep();
+    };
+  }, [keepPlace]);
 
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const { marks, notes: written } = useMarks();

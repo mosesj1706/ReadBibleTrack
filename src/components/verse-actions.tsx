@@ -31,7 +31,7 @@ export function VerseActions({
   const theme = useTheme();
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const { markOn, noteOn, highlight, star, write, share, shareNote } = useMarks();
-  const { bookmark, mark: logRead } = useProgress();
+  const { bookmark, mark: logRead, keepPlace } = useProgress();
 
   const range: VerseRange = { start: verseId, end: verseId };
   const existing = markOn(range);
@@ -41,6 +41,7 @@ export function VerseActions({
   const [draft, setDraft] = useState(note?.body ?? '');
 
   const toHere = readUpTo(verseId, bookmark);
+  const here = bookmark === verseId;
 
   return (
     <Glass floating solid style={styles.sheet}>
@@ -153,6 +154,10 @@ export function VerseActions({
         </View>
       ) : null}
 
+      {/* Two different claims, deliberately not one control. "Read to here"
+          says the verses behind you have been read; "my place" says only that
+          this is where you stopped. Someone dipping into the middle of a book
+          should be able to keep their place without claiming the book. */}
       <Pressable
         onPress={() => {
           logRead(toHere);
@@ -163,6 +168,19 @@ export function VerseActions({
       >
         <ThemedText type="smallBold" themeColor="accent">
           Read to here — {formatReference(toHere)}
+        </ThemedText>
+      </Pressable>
+
+      <Pressable
+        onPress={() => {
+          keepPlace(verseId);
+          onClose();
+        }}
+        accessibilityRole="button"
+        style={[styles.readTo, { borderColor: theme.border }]}
+      >
+        <ThemedText type="smallBold" themeColor="textSecondary">
+          {here ? '✓ This is where you stopped' : 'Leave off here'}
         </ThemedText>
       </Pressable>
     </Glass>

@@ -200,6 +200,53 @@ describe('the reading log', () => {
   });
 });
 
+describe('where someone stopped reading', () => {
+  test('a circle-mate cannot see your place, unlike your reading', async () => {
+    const kept = await anna.db
+      .from('reading_place')
+      .upsert({ user_id: anna.id, verse_id: 1_001_023 });
+    assert.equal(kept.error, null, kept.error?.message ?? 'expected no error');
+
+    const { data: mine } = await anna.db.from('reading_place').select('verse_id');
+    assert.equal(mine?.[0]?.verse_id, 1_001_023, 'Anna can see her own');
+
+    // Deliberately unlike reading_log, which the circle does see. A shared
+    // plan should not become a race, and where someone's eyes stopped last
+    // night is nobody else's business.
+    const { data: mate } = await sam.db
+      .from('reading_place')
+      .select('verse_id')
+      .eq('user_id', anna.id);
+    assert.deepEqual(mate, [], 'Sam reads with Anna and still cannot see it');
+  });
+
+  test('nobody can move someone else’s place', async () => {
+    const { error } = await sam.db
+      .from('reading_place')
+      .upsert({ user_id: anna.id, verse_id: 66_022_021 });
+    assert.ok(error, 'the policy refuses a forged user_id');
+    assert.match(error.message, /row-level security/i);
+
+    const { data } = await anna.db.from('reading_place').select('verse_id');
+    assert.equal(data?.[0]?.verse_id, 1_001_023, 'Anna’s place is where she left it');
+  });
+
+  test('moving your own place replaces it rather than adding another', async () => {
+    await anna.db.from('reading_place').upsert({ user_id: anna.id, verse_id: 43_003_016 });
+    const { data } = await anna.db.from('reading_place').select('verse_id');
+    assert.equal(data?.length, 1, 'one row per person, because it is a pointer');
+    assert.equal(data?.[0]?.verse_id, 43_003_016);
+  });
+
+  test('a place outside the canon is refused by the database', async () => {
+    const { error } = await anna.db
+      .from('reading_place')
+      .upsert({ user_id: anna.id, verse_id: 99_999_999 });
+    assert.ok(error);
+    assert.match(error.message, /reading_place_in_canon/);
+  });
+});
+
 describe('profiles', () => {
   test('you cannot rename someone else', async () => {
     await sam.db.from('profiles').update({ display_name: 'Not Anna' }).eq('id', anna.id);

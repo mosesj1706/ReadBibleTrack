@@ -173,13 +173,40 @@ export async function readBookmark(): Promise<VerseId | undefined> {
   return row?.verse_id;
 }
 
-/** Move the bookmark. Called after logging a range, with its last verse. */
-export async function moveBookmark(verseId: VerseId): Promise<void> {
+/**
+ * The bookmark and when it was last moved.
+ *
+ * The time matters only to the sync. A bookmark is a pointer rather than a
+ * set, so two devices cannot be merged into a union the way their reading can;
+ * the one that moved most recently is the one that is right.
+ */
+export async function readBookmarkMoved(): Promise<
+  { verseId: VerseId; movedAt: string } | undefined
+> {
+  const db = await progressDatabase();
+  const row = await db.getFirstAsync<{ verse_id: number; moved_at: string }>(
+    'select verse_id, moved_at from bookmark where id = 1',
+  );
+  return row ? { verseId: row.verse_id, movedAt: row.moved_at } : undefined;
+}
+
+/**
+ * Move the bookmark. Called after logging a range, with its last verse, and
+ * as someone reads.
+ *
+ * `movedAt` is passed only when applying another device's bookmark, so that it
+ * keeps the time it was made rather than claiming to have happened now — which
+ * would make it beat anything this device does next.
+ */
+export async function moveBookmark(
+  verseId: VerseId,
+  movedAt = new Date().toISOString(),
+): Promise<void> {
   const db = await progressDatabase();
   await db.runAsync(
     `insert into bookmark (id, verse_id, moved_at) values (1, ?, ?)
        on conflict (id) do update set verse_id = excluded.verse_id, moved_at = excluded.moved_at`,
     verseId,
-    new Date().toISOString(),
+    movedAt,
   );
 }
