@@ -4,6 +4,7 @@ import { describe, test } from 'node:test';
 import { getBook } from './canon.ts';
 import {
   OPEN_PLAN,
+  carryOnAt,
   customPlan,
   dayOfPlan,
   planVerses,
@@ -209,4 +210,20 @@ describe('the canon is what plans are measured against', () => {
       assert.ok(planVerses(customPlan('x', [range], 7)) > 0);
     }
   });
+});
+
+test('with a plan, carrying on stays inside today’s portion', () => {
+  const portion = [{ start: 43_003_001, end: 43_003_021 }];
+  assert.equal(carryOnAt(portion, [], undefined), 43_003_001);
+});
+
+test('without a plan, the bookmark wins over the first gap in the canon', () => {
+  // Reading John with Genesis unfinished should offer John, not Genesis.
+  const read = [{ start: 1_001_001, end: 1_001_010 }];
+  assert.equal(carryOnAt([], read, 43_003_016), 43_003_016);
+});
+
+test('without a plan or a bookmark, carrying on is the first thing unread', () => {
+  const read = [{ start: 1_001_001, end: 1_001_010 }];
+  assert.equal(carryOnAt([], read, undefined), 1_001_011);
 });

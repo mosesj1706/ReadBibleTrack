@@ -144,8 +144,13 @@ export function AppNavigation({ children }: { readonly children: React.ReactNode
     );
   });
 
-  if (hidden) return <>{children}</>;
-
+  // Deliberately not an early `return <>{children}</>` when the bar is hidden.
+  // That put `children` under a Fragment on the reader and under two Views
+  // everywhere else, and React tears down a subtree whose element type changes
+  // beneath it — so entering or leaving a chapter unmounted and rebuilt the
+  // whole navigator. The native stack went with it, and the interactive back
+  // gesture belongs to the native stack: the swipe worked or did not depending
+  // on how the rebuild had landed. The bar is hidden by not rendering the bar.
   if (wide) {
     // The rail and the page are one object, centred together. Pinning the rail
     // to the far edge and centring the column in whatever is left makes them
@@ -162,11 +167,13 @@ export function AppNavigation({ children }: { readonly children: React.ReactNode
       // left edge.
       <Ground>
         <View style={styles.wideOuter}>
-        <View style={styles.wideInner}>
-          <Glass style={styles.rail}>
-            {items}
-            <RailSummary />
-          </Glass>
+        <View style={hidden ? styles.wideFull : styles.wideInner}>
+          {hidden ? null : (
+            <Glass style={styles.rail}>
+              {items}
+              <RailSummary />
+            </Glass>
+          )}
           <View style={styles.grow}>{children}</View>
         </View>
         </View>
@@ -177,16 +184,18 @@ export function AppNavigation({ children }: { readonly children: React.ReactNode
   return (
     <View style={styles.grow}>
       <View style={styles.grow}>{children}</View>
-      <Glass
-        floating
-        style={[styles.bar, { marginBottom: Math.max(insets.bottom, Spacing.three) }]}
-      >
-        <Animated.View
-          pointerEvents="none"
-          style={[styles.island, { backgroundColor: theme.accentSoft }, island]}
-        />
-        {items}
-      </Glass>
+      {hidden ? null : (
+        <Glass
+          floating
+          style={[styles.bar, { marginBottom: Math.max(insets.bottom, Spacing.three) }]}
+        >
+          <Animated.View
+            pointerEvents="none"
+            style={[styles.island, { backgroundColor: theme.accentSoft }, island]}
+          />
+          {items}
+        </Glass>
+      )}
     </View>
   );
 }
@@ -243,6 +252,10 @@ const styles = StyleSheet.create({
   // still governs paragraphs — it just no longer governs the whole app.
   wideOuter: { flex: 1, flexDirection: 'row', justifyContent: 'center' },
   wideInner: { flex: 1, flexDirection: 'row', maxWidth: 176 + MaxPageWidth + Spacing.six },
+  // With the rail gone the reader owns the window, as it did when this branch
+  // returned the children bare. A style swap rather than a different tree:
+  // changing the shape here is what was rebuilding the navigator.
+  wideFull: { flex: 1, flexDirection: 'row' },
   // `auto` on top pushes the summary to the foot of the rail, so the nav items
   // stay together at the head of it rather than being spread down the whole
   // height.

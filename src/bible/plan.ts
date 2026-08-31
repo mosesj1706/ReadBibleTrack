@@ -224,3 +224,25 @@ export function customPlan(
 ): ComputedPlan {
   return { kind: 'computed', id: 'custom', name, portions, days };
 }
+
+/**
+ * Where reading should pick up again.
+ *
+ * With a plan, inside today's portion; without one, from wherever reading
+ * actually stopped, anywhere in the canon. The bookmark is preferred to the
+ * arithmetic because it knows where you were, not merely where the first gap
+ * is — someone reading John while a gap sits in Genesis should be offered
+ * John.
+ *
+ * Shared rather than written out at each call site: Today and the book list
+ * both offer to carry on, and two copies of this rule would eventually offer
+ * two different verses.
+ */
+export function carryOnAt(
+  portion: readonly VerseRange[],
+  read: readonly VerseRange[],
+  bookmark: VerseId | undefined,
+): VerseId | undefined {
+  if (portion.length > 0) return resumeAt(portion, read);
+  return bookmark ?? resumeAt([canonSpan()], read);
+}

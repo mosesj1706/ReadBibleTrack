@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { useAnimatedScrollHandler, useSharedValue } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { portionFor, resumeAt } from '@/bible/plan.ts';
+import { carryOnAt, portionFor } from '@/bible/plan.ts';
 import { formatReference } from '@/bible/reference.ts';
 import { canonSpan, subtractRanges } from '@/bible/verse-id.ts';
 import { countVerses, progressThrough } from '@/bible/versification.ts';
@@ -54,9 +54,7 @@ export default function TodayScreen() {
   const done = planned && left === 0;
   const share = progressThrough(portion, read);
 
-  // With a plan, carry on inside today's portion. Without one, carry on from
-  // wherever reading stopped, anywhere in the canon.
-  const carryOn = planned ? resumeAt(portion, read) : (bookmark ?? resumeAt([canonSpan()], read));
+  const carryOn = carryOnAt(portion, read, bookmark);
   const readEverything = countVerses(read);
 
   // A taste of what you are about to read: the plan's portion if there is

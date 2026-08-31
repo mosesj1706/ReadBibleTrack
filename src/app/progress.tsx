@@ -31,6 +31,9 @@ import { Fonts, MaxPageWidth, Radius, SectionColors, Spacing } from '@/constants
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useTheme } from '@/hooks/use-theme';
 import { isFullyRead, useProgress } from '@/progress/provider';
+import { usePlan } from '@/plans/provider';
+import { carryOnAt, portionFor } from '@/bible/plan.ts';
+import { formatReference } from '@/bible/reference.ts';
 
 function leave(): void {
   if (router.canGoBack()) router.back();
@@ -45,7 +48,9 @@ export default function ProgressScreen() {
   const onScroll = useAnimatedScrollHandler((event) => {
     scrolled.value = event.contentOffset.y;
   });
-  const { ranges: read, mark, unmark } = useProgress();
+  const { ranges: read, bookmark, mark, unmark } = useProgress();
+  const { plan, day } = usePlan();
+  const carryOn = carryOnAt(portionFor(plan, day), read, bookmark);
   // Which book has its chapters open. One at a time: this is a list of
   // sixty-six, and several expanded at once stops being a list.
   const [open, setOpen] = useState<number | undefined>(undefined);
@@ -90,6 +95,29 @@ export default function ProgressScreen() {
             <Bar fraction={whole} />
           </Card>
           </Rise>
+
+          {/* The way back to what you were reading. Tapping a tab replaces the
+              screen rather than stacking on it, so opening this page from a
+              chapter closes the chapter — right for a tab, but it left the
+              book list as the one place with a hundred ways in and none back.
+              Same rule as Today's, so the two never offer different verses. */}
+          {carryOn ? (
+            <Rise delay={60}>
+              <Link
+                href={{
+                  pathname: '/read/[reference]',
+                  params: { reference: formatReference({ start: carryOn, end: carryOn }) },
+                }}
+                asChild
+              >
+                <Pressable accessibilityRole="link" style={[styles.carryOn, { borderColor: theme.border }]}>
+                  <ThemedText type="smallBold" themeColor="accent">
+                    Carry on with {formatReference({ start: carryOn, end: carryOn })} ›
+                  </ThemedText>
+                </Pressable>
+              </Link>
+            </Rise>
+          ) : null}
 
           {SECTIONS.map((section) => {
             const hue = SectionColors[scheme][section.key];
@@ -313,6 +341,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderWidth: StyleSheet.hairlineWidth,
     borderRadius: Radius.small,
+  },
+  carryOn: {
+    paddingVertical: Spacing.three,
+    paddingHorizontal: Spacing.three,
+    borderRadius: Spacing.two,
+    borderWidth: StyleSheet.hairlineWidth,
+    alignItems: 'center',
+    marginBottom: Spacing.three,
   },
   readInstead: { minHeight: 44, justifyContent: 'center' },
   bookRow: {
