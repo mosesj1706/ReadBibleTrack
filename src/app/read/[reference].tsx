@@ -22,11 +22,11 @@ import { formatReference, parseReference } from '@/bible/reference.ts';
 import { fromVerseId } from '@/bible/verse-id.ts';
 import { chapterRange, nextChapter, previousChapter } from '@/bible/versification.ts';
 import { ChapterMarkings } from '@/components/chapter-markings';
-import { Animated, SlideIn, useCollapse } from '@/components/motion';
+import { Animated, SlideIn, SwipeAway, useCollapse } from '@/components/motion';
 import {  } from '@/components/navigation';
 import { PassagePalette } from '@/components/passage-palette';
 import { ScriptureText } from '@/components/scripture-text';
-import { Glass, Ground, Page } from '@/components/surfaces';
+import { Glass, Ground, Page, Panel } from '@/components/surfaces';
 import { VerseActions } from '@/components/verse-actions';
 import { TranslationPicker } from '@/components/translation-picker';
 import { ThemedText } from '@/components/themed-text';
@@ -271,7 +271,7 @@ export default function ReaderScreen() {
         </Glass>
 
         <View style={styles.columns}>
-        {wide ? <Glass solid style={styles.side}>{palette}</Glass> : null}
+        {wide ? <View style={styles.side}>{palette}</View> : null}
         <View style={styles.middle}>
         <Animated.View style={[styles.bar, { borderBottomColor: theme.border }, chromeStyle]}>
           <Step
@@ -374,9 +374,21 @@ export default function ReaderScreen() {
               fromX={drawer === 'palette' ? -40 : 40}
               style={styles.drawerPanel}
             >
-              <Glass floating solid style={styles.drawerFill}>
-                {drawer === 'palette' ? palette : markings}
-              </Glass>
+              {/* Opaque, not frosted. A panel you can see the chapter
+                  through reads as a layer when it is still and as a mess
+                  when it travels, which this one now does. */}
+              {drawer === 'palette' ? (
+                // Brings its own surface: at the first step the whole panel
+                // travels, and a surface left behind by its contents is
+                // worse than no movement at all.
+                palette
+              ) : (
+                // The palette walks back through its own steps; the markings
+                // have no steps, so a swipe simply closes them.
+                <SwipeAway style={styles.drawerFill} onAway={() => setDrawer('none')}>
+                  <Panel style={styles.drawerFill}>{markings}</Panel>
+                </SwipeAway>
+              )}
             </SlideIn>
           </View>
         ) : null}

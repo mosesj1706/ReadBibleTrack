@@ -11,9 +11,19 @@
  * turned off so it cannot take the whole reader away underneath it. A swipe
  * here is therefore handled here: it walks back up the three steps and, from
  * the top, closes the panel and gives the chapter back.
+ *
+ * All three steps are laid out side by side on one track, and moving between
+ * them moves the track. They were one pane whose contents were swapped, which
+ * meant a swipe slid the step away to reveal the chapter behind the panel and
+ * then changed what it said — you never saw where you were going, only where
+ * you had been leaving from. Side by side, the step you are going back to is
+ * already there, and the swipe uncovers it.
+ *
+ * The books keep their scroll position for free as a result: the list is never
+ * unmounted, it is only moved off to the side.
  */
 
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import {
   runOnJS,
   useAnimatedStyle,
@@ -22,14 +32,14 @@ import {
   withTiming,
   type SharedValue,
 } from 'react-native-reanimated';
-import { ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import type { NativeScrollEvent, NativeSyntheticEvent } from 'react-native';
 
 import { BOOKS, getBook } from '@/bible/canon.ts';
 import { SECTIONS, sectionOf } from '@/bible/sections.ts';
 import { lastVerse } from '@/bible/versification.ts';
 import { Animated, Quick, Settle, Tappable, useReducedMotion } from '@/components/motion';
+import { Panel } from '@/components/surfaces';
 import { ThemedText } from '@/components/themed-text';
 import { Fonts, Radius, SectionColors, Spacing } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -51,9 +61,10 @@ type Step = 'books' | 'chapters' | 'verses';
  * pixels of level, which no real finger does.
  */
 function swipeBack(
-  drag: SharedValue<number>,
-  width: number,
-  immediate: boolean,
+  offset: SharedValue<number>,
+  rest: number,
+  pane: number,
+  atStart: boolean,
   back: () => void,
 ) {
   return Gesture.Pan()
@@ -62,30 +73,36 @@ function swipeBack(
     .onUpdate((event) => {
       // Never leftwards: there is nothing that way, and letting it move would
       // promise something the release cannot deliver.
-      drag.value = Math.max(0, event.translationX);
+      offset.value = rest + Math.max(0, event.translationX);
     })
     .onEnd((event) => {
       if (event.translationX < 40 && event.velocityX < 300) {
-        drag.value = withSpring(0, Settle);
+        offset.value = withSpring(rest, Settle);
         return;
       }
-      // From the list of books there is no further step to slide away to: the
-      // panel itself is what leaves, and it has its own way of doing that.
-      if (immediate) {
-        drag.value = 0;
+      // At the first step the track has nowhere further left to go: what is
+      // behind the panel is the chapter, and closing the panel is what shows
+      // it. The panel has its own way of leaving.
+      if (atStart) {
+        offset.value = rest;
         runOnJS(back)();
         return;
       }
-      drag.value = withTiming(width, Quick, (done) => {
-        if (!done) return;
-        // Once the outgoing step has left, so the two never overlap. The step
-        // arriving comes from the left, as the thing you are going back to
-        // does.
-        runOnJS(back)();
-        drag.value = -32;
-        drag.value = withSpring(0, Settle);
+      // Straight to where the previous step rests, so nothing has to be put
+      // back afterwards — the step changes when the track is already there,
+      // and there is no frame in which the two disagree.
+      offset.value = withTiming(rest + pane, Quick, (done) => {
+        if (done) runOnJS(back)();
       });
     });
+}
+
+/** Left to right, in the order they narrow. */
+const STEPS = ['books', 'chapters', 'verses'] as const;
+
+/** Moving the track, from anywhere that is not a gesture. */
+function slideTo(offset: SharedValue<number>, to: number, animated: boolean) {
+  offset.value = animated ? withSpring(to, Settle) : to;
 }
 
 export function PassagePalette({
@@ -110,66 +127,47 @@ export function PassagePalette({
 
   const meta = getBook(chosenBook);
 
-  const scroller = useRef<ScrollView>(null);
-  // Where the list of books was left. Sixty-six books do not fit on a phone,
-  // so returning to the top of them is returning to the wrong place: the book
-  // you just came out of is the one you are most likely to want again.
-  const booksAt = useRef(0);
+  // The panel's own width, which the panes are cut to. Measured rather than
+  // assumed: this is a drawer on a phone and a column on a desktop.
+  const [pane, setPane] = useState(0);
+  const index = STEPS.indexOf(step);
+  const rest = -index * pane;
+
+  const reduced = useReducedMotion();
+  const offset = useSharedValue(0);
+  const track = useAnimatedStyle(() => ({ transform: [{ translateX: offset.value }] }));
+  // At the first step the track cannot move, so the panel itself does.
+  const panel = useAnimatedStyle(() => ({
+    transform: [{ translateX: index === 0 ? offset.value : 0 }],
+  }));
+
+  const go = (next: Step) => {
+    setStep(next);
+    slideTo(offset, -STEPS.indexOf(next) * pane, !reduced);
+  };
 
   const back = () => {
-    if (step === 'verses') setStep('chapters');
-    else if (step === 'chapters') setStep('books');
+    if (step === 'verses') go('chapters');
+    else if (step === 'chapters') go('books');
     else onBack?.();
   };
 
-  // The panel travels under the finger, the way a screen does when it is
-  // swiped away. Detecting the swipe and then jumping is the same navigation
-  // and a quite different thing to use: nothing moves until everything has,
-  // so there is no moment where you can see what the gesture is doing and
-  // change your mind about it.
-  //
-  // Gesture handler rather than PanResponder: the drag runs on the UI thread,
-  // so it keeps up with the finger even while this thread is laying out a
-  // hundred and fifty chapters. `activeOffsetX` and `failOffsetY` do the
-  // claiming that a hand-written responder was doing badly — sideways wins,
-  // downwards goes to the list, and neither has to be perfectly straight.
-  const { width } = useWindowDimensions();
-  const reduced = useReducedMotion();
-  const drag = useSharedValue(0);
-  const travelling = useAnimatedStyle(() => ({ transform: [{ translateX: drag.value }] }));
-
-  const atBooks = step === 'books';
-
-  const swipe = swipeBack(drag, width, atBooks || reduced, back);
-
-  const onScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-    if (step === 'books') booksAt.current = event.nativeEvent.contentOffset.y;
-  };
-
-  // The restore has to wait for the books to be laid out again, and the
-  // content changing size is the moment they are. No flag saying a restore is
-  // due: scrolling the books does not change the content's size, so the only
-  // time this fires on the book list is when the list has just come back.
-  const onContentSize = () => {
-    if (step !== 'books') return;
-    scroller.current?.scrollTo({ y: booksAt.current, animated: false });
-  };
+  const swipe = swipeBack(offset, rest, pane, index === 0 || reduced, back);
 
   return (
-    <GestureDetector gesture={swipe}>
-    <Animated.View style={[styles.root, travelling]}>
+    <Panel style={[styles.root, panel]}>
+      <View
+        style={styles.measure}
+        onLayout={(event) => setPane(event.nativeEvent.layout.width)}
+      />
       <View style={styles.crumbs}>
-        <Crumb label="Books" active={step === 'books'} onPress={() => setStep('books')} />
+        <Crumb label="Books" active={step === 'books'} onPress={() => go('books')} />
         {step !== 'books' && meta ? (
           <>
             <ThemedText type="small" themeColor="textFaint">
               ›
             </ThemedText>
-            <Crumb
-              label={meta.abbr}
-              active={step === 'chapters'}
-              onPress={() => setStep('chapters')}
-            />
+            <Crumb label={meta.abbr} active={step === 'chapters'} onPress={() => go('chapters')} />
           </>
         ) : null}
         {step === 'verses' ? (
@@ -177,119 +175,131 @@ export function PassagePalette({
             <ThemedText type="small" themeColor="textFaint">
               ›
             </ThemedText>
-            <Crumb label={String(chosenChapter)} active onPress={() => setStep('verses')} />
+            <Crumb label={String(chosenChapter)} active onPress={() => go('verses')} />
           </>
         ) : null}
       </View>
 
-      <ScrollView
-        ref={scroller}
-        onScroll={onScroll}
-        onContentSizeChange={onContentSize}
-        scrollEventThrottle={16}
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scroll}
-      >
-        {step === 'books' ? (
-          <>
-            {SECTIONS.map((section) => (
-              <View key={section.key} style={styles.group}>
-                <View style={styles.sectionHead}>
-                  <View
-                    style={[styles.swatch, { backgroundColor: SectionColors[scheme][section.key] }]}
-                  />
-                  <ThemedText
-                    type="small"
-                    style={[styles.eyebrow, { color: SectionColors[scheme][section.key] }]}
-                  >
-                    {section.name}
-                  </ThemedText>
-                </View>
-                {BOOKS.filter(
-                  (b) => b.number >= section.first && b.number <= section.last,
-                ).map((b) => {
-                  const here = b.number === book;
-                  return (
-                    <Tappable
-                      key={b.number}
-                      onPress={() => {
-                        setChosenBook(b.number);
-                        setChosenChapter(1);
-                        // One-chapter books have nothing to choose.
-                        if (b.chapters === 1) onPick(b.number, 1);
-                        else setStep('chapters');
-                      }}
-                      accessibilityRole="button"
-                      accessibilityState={{ selected: here }}
-                      style={[
-                        styles.bookRow,
-                        here ? { backgroundColor: theme.accentSoft } : undefined,
-                      ]}
-                    >
-                      <View style={styles.bookLine}>
-                        {/* The spine down the left edge is what makes a long
-                            list scannable: you find the Gospels by colour
-                            before you have read a single name. */}
-                        <View style={[styles.spine, { backgroundColor: hueOf(b.number) }]} />
-                        <ThemedText
-                          type={here ? 'smallBold' : 'small'}
-                          themeColor={here ? 'accent' : 'text'}
-                          numberOfLines={1}
+      <View style={styles.viewport}>
+        <GestureDetector gesture={swipe}>
+          <Animated.View style={[styles.track, track]}>
+            <View style={{ width: pane }}>
+              <ScrollView
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={styles.scroll}
+              >
+                {SECTIONS.map((section) => (
+                  <View key={section.key} style={styles.group}>
+                    <View style={styles.sectionHead}>
+                      <View
+                        style={[
+                          styles.swatch,
+                          { backgroundColor: SectionColors[scheme][section.key] },
+                        ]}
+                      />
+                      <ThemedText
+                        type="small"
+                        style={[styles.eyebrow, { color: SectionColors[scheme][section.key] }]}
+                      >
+                        {section.name}
+                      </ThemedText>
+                    </View>
+                    {BOOKS.filter(
+                      (b) => b.number >= section.first && b.number <= section.last,
+                    ).map((b) => {
+                      const here = b.number === book;
+                      return (
+                        <Tappable
+                          key={b.number}
+                          onPress={() => {
+                            setChosenBook(b.number);
+                            setChosenChapter(1);
+                            // One-chapter books have nothing to choose.
+                            if (b.chapters === 1) onPick(b.number, 1);
+                            else go('chapters');
+                          }}
+                          accessibilityRole="button"
+                          accessibilityState={{ selected: here }}
+                          style={[
+                            styles.bookRow,
+                            here ? { backgroundColor: theme.accentSoft } : undefined,
+                          ]}
                         >
-                          {b.name}
-                        </ThemedText>
-                      </View>
-                    </Tappable>
-                  );
-                })}
-              </View>
-            ))}
-          </>
-        ) : null}
+                          <View style={styles.bookLine}>
+                            {/* The spine down the left edge is what makes a
+                                long list scannable: you find the Gospels by
+                                colour before you have read a single name. */}
+                            <View style={[styles.spine, { backgroundColor: hueOf(b.number) }]} />
+                            <ThemedText
+                              type={here ? 'smallBold' : 'small'}
+                              themeColor={here ? 'accent' : 'text'}
+                              numberOfLines={1}
+                            >
+                              {b.name}
+                            </ThemedText>
+                          </View>
+                        </Tappable>
+                      );
+                    })}
+                  </View>
+                ))}
+              </ScrollView>
+            </View>
 
-        {step === 'chapters' && meta ? (
-          <View style={styles.grid}>
-            {Array.from({ length: meta.chapters }, (_, i) => i + 1).map((c) => {
-              const here = chosenBook === book && c === chapter;
-              return (
-                <Tile
-                  key={c}
-                  label={String(c)}
-                  active={here}
-                  onPress={() => onPick(chosenBook, c)}
-                  onLongPress={() => {
-                    setChosenChapter(c);
-                    setStep('verses');
-                  }}
-                />
-              );
-            })}
-          </View>
-        ) : null}
+            <View style={{ width: pane }}>
+              <ScrollView
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={styles.scroll}
+              >
+                <View style={styles.grid}>
+                  {meta
+                    ? Array.from({ length: meta.chapters }, (_, i) => i + 1).map((c) => (
+                        <Tile
+                          key={c}
+                          label={String(c)}
+                          active={chosenBook === book && c === chapter}
+                          onPress={() => onPick(chosenBook, c)}
+                          onLongPress={() => {
+                            setChosenChapter(c);
+                            go('verses');
+                          }}
+                        />
+                      ))
+                    : null}
+                </View>
+              </ScrollView>
+            </View>
 
-        {step === 'verses' ? (
-          <View style={styles.grid}>
-            {Array.from({ length: lastVerse(chosenBook, chosenChapter) }, (_, i) => i + 1).map(
-              (v) => (
-                <Tile
-                  key={v}
-                  label={String(v)}
-                  active={false}
-                  onPress={() => onPick(chosenBook, chosenChapter, v)}
-                />
-              ),
-            )}
-          </View>
-        ) : null}
-      </ScrollView>
+            <View style={{ width: pane }}>
+              <ScrollView
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={styles.scroll}
+              >
+                <View style={styles.grid}>
+                  {Array.from(
+                    { length: lastVerse(chosenBook, chosenChapter) },
+                    (_, i) => i + 1,
+                  ).map((v) => (
+                    <Tile
+                      key={v}
+                      label={String(v)}
+                      active={false}
+                      onPress={() => onPick(chosenBook, chosenChapter, v)}
+                    />
+                  ))}
+                </View>
+              </ScrollView>
+            </View>
+          </Animated.View>
+        </GestureDetector>
+      </View>
 
       {step === 'chapters' ? (
         <ThemedText type="small" themeColor="textFaint" style={styles.hint}>
           Hold a chapter to pick a verse
         </ThemedText>
       ) : null}
-    </Animated.View>
-    </GestureDetector>
+    </Panel>
   );
 }
 
@@ -352,6 +362,14 @@ function Tile({
 
 const styles = StyleSheet.create({
   root: { flex: 1, gap: Spacing.two },
+  // The track is wider than the panel; without this it would be drawn
+  // spilling out over the chapter beside it.
+  // Nothing to look at: it exists to report the panel's width, which the
+  // panes are cut to. Measuring the panel itself would mean measuring the
+  // thing whose transform is being animated.
+  measure: { position: 'absolute', left: 0, right: 0, height: 0 },
+  viewport: { flex: 1, overflow: 'hidden' },
+  track: { flex: 1, flexDirection: 'row' },
   crumbs: {
     flexDirection: 'row',
     alignItems: 'center',

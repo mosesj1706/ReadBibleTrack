@@ -19,7 +19,9 @@ import {
   type StyleProp,
   type ViewStyle,
 } from 'react-native';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
+  runOnJS,
   useAnimatedStyle,
   useSharedValue,
   withDelay,
@@ -223,6 +225,58 @@ export function useCollapse(offset: SharedValue<number>, height: number) {
       transform: [{ translateY: -8 * t }],
     };
   });
+}
+
+/**
+ * Something a rightward swipe pushes off to the side.
+ *
+ * For a panel that lies over a page rather than being a screen: the system's
+ * own back gesture is turned off underneath it, so without this a swipe at it
+ * does nothing at all, which reads as the app having stopped listening.
+ *
+ * It follows the finger and springs back if the swipe is not carried through,
+ * so the gesture can be abandoned halfway — which is most of what makes the
+ * real one feel like a physical thing rather than a trigger.
+ *
+ * The gesture is built by a function at module scope because the React
+ * Compiler will not allow a shared value to be written from a function created
+ * during render, and a gesture is configured by exactly such functions.
+ */
+function swipeAway(offset: SharedValue<number>, away: () => void) {
+  return Gesture.Pan()
+    .activeOffsetX(10)
+    .failOffsetY([-14, 14])
+    .onUpdate((event) => {
+      offset.value = Math.max(0, event.translationX);
+    })
+    .onEnd((event) => {
+      if (event.translationX > 40 || event.velocityX > 300) {
+        offset.value = 0;
+        runOnJS(away)();
+        return;
+      }
+      offset.value = withSpring(0, Settle);
+    });
+}
+
+export function SwipeAway({
+  children,
+  onAway,
+  style,
+}: {
+  readonly children: ReactNode;
+  readonly onAway: () => void;
+  readonly style?: StyleProp<ViewStyle>;
+}) {
+  const offset = useSharedValue(0);
+  const travelling = useAnimatedStyle(() => ({ transform: [{ translateX: offset.value }] }));
+  const gesture = swipeAway(offset, onAway);
+
+  return (
+    <GestureDetector gesture={gesture}>
+      <Animated.View style={[style, travelling]}>{children}</Animated.View>
+    </GestureDetector>
+  );
 }
 
 export { Animated };

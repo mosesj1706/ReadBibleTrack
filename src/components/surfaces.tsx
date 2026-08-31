@@ -16,6 +16,7 @@ import { Platform, StyleSheet, View, type StyleProp, type ViewStyle } from 'reac
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
+  type AnimatedStyle,
   type SharedValue,
 } from 'react-native-reanimated';
 
@@ -141,6 +142,38 @@ export function Glass({
   );
 }
 
+/**
+ * A panel that sits over the page: the books list, a chapter's markings.
+ *
+ * Opaque, unlike Glass. A frosted panel over a page of text reads as a layer
+ * when it is still and as a mess when it moves — the words behind it slide at
+ * a different rate to the words on it, and during a swipe there is a moment
+ * where neither can be read. Something that travels has to be something you
+ * can see through nothing of.
+ */
+export function Panel({
+  children,
+  style,
+}: {
+  readonly children: ReactNode;
+  /** Animated styles are accepted: a panel is a thing that travels. */
+  readonly style?: StyleProp<AnimatedStyle<ViewStyle>>;
+}) {
+  const theme = useTheme();
+  return (
+    <Animated.View
+      style={[
+        styles.panel,
+        { backgroundColor: theme.background, borderColor: theme.border },
+        Elevation.floating,
+        style,
+      ]}
+    >
+      {children}
+    </Animated.View>
+  );
+}
+
 /** A raised opaque surface: cards, rows, anything holding content. */
 export function Card({
   children,
@@ -189,6 +222,11 @@ const styles = StyleSheet.create({
   // uncovers a hard edge at the bottom.
   drift: { position: 'absolute', left: 0, right: 0, top: -120, bottom: -220 },
   glass: {
+    borderRadius: Radius.panel,
+    borderWidth: StyleSheet.hairlineWidth,
+    overflow: 'hidden',
+  },
+  panel: {
     borderRadius: Radius.panel,
     borderWidth: StyleSheet.hairlineWidth,
     overflow: 'hidden',
