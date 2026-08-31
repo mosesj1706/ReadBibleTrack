@@ -14,19 +14,79 @@
  */
 
 import { useRef, useState } from 'react';
-import { PanResponder, ScrollView, StyleSheet, View } from 'react-native';
+import {
+  runOnJS,
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+  withTiming,
+  type SharedValue,
+} from 'react-native-reanimated';
+import { ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import type { NativeScrollEvent, NativeSyntheticEvent } from 'react-native';
 
 import { BOOKS, getBook } from '@/bible/canon.ts';
 import { SECTIONS, sectionOf } from '@/bible/sections.ts';
 import { lastVerse } from '@/bible/versification.ts';
-import { Tappable } from '@/components/motion';
+import { Animated, Quick, Settle, Tappable, useReducedMotion } from '@/components/motion';
 import { ThemedText } from '@/components/themed-text';
 import { Fonts, Radius, SectionColors, Spacing } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useTheme } from '@/hooks/use-theme';
 
 type Step = 'books' | 'chapters' | 'verses';
+
+/**
+ * The gesture that walks the panel back a step.
+ *
+ * Built here rather than in the component because the React Compiler will not
+ * allow a shared value to be written from a function created during render,
+ * and a gesture is configured by exactly such functions. It is a piece of
+ * machinery handed the things it needs, which is what it looks like.
+ *
+ * `activeOffsetX` and `failOffsetY` do the claiming: sideways wins, downwards
+ * goes to the list underneath, and neither has to be perfectly straight. A
+ * hand-written responder did this badly, demanding a drag stay within ten
+ * pixels of level, which no real finger does.
+ */
+function swipeBack(
+  drag: SharedValue<number>,
+  width: number,
+  immediate: boolean,
+  back: () => void,
+) {
+  return Gesture.Pan()
+    .activeOffsetX(10)
+    .failOffsetY([-14, 14])
+    .onUpdate((event) => {
+      // Never leftwards: there is nothing that way, and letting it move would
+      // promise something the release cannot deliver.
+      drag.value = Math.max(0, event.translationX);
+    })
+    .onEnd((event) => {
+      if (event.translationX < 40 && event.velocityX < 300) {
+        drag.value = withSpring(0, Settle);
+        return;
+      }
+      // From the list of books there is no further step to slide away to: the
+      // panel itself is what leaves, and it has its own way of doing that.
+      if (immediate) {
+        drag.value = 0;
+        runOnJS(back)();
+        return;
+      }
+      drag.value = withTiming(width, Quick, (done) => {
+        if (!done) return;
+        // Once the outgoing step has left, so the two never overlap. The step
+        // arriving comes from the left, as the thing you are going back to
+        // does.
+        runOnJS(back)();
+        drag.value = -32;
+        drag.value = withSpring(0, Settle);
+      });
+    });
+}
 
 export function PassagePalette({
   book,
@@ -62,21 +122,25 @@ export function PassagePalette({
     else onBack?.();
   };
 
-  // Built each render rather than held in a ref, so `back` is never the
-  // version from a step ago.
+  // The panel travels under the finger, the way a screen does when it is
+  // swiped away. Detecting the swipe and then jumping is the same navigation
+  // and a quite different thing to use: nothing moves until everything has,
+  // so there is no moment where you can see what the gesture is doing and
+  // change your mind about it.
   //
-  // Capture, so this is asked before the list underneath rather than after:
-  // the list claimed every drag that was not almost perfectly level, which is
-  // most of them, and the swipe only answered to a long deliberate one. The
-  // test is which way the drag is *going*, not how straight it is — a real
-  // finger wanders — and a flick counts as well as a long pull.
-  const swipe = PanResponder.create({
-    onMoveShouldSetPanResponderCapture: (_event, gesture) =>
-      gesture.dx > 8 && gesture.dx > Math.abs(gesture.dy) * 1.5,
-    onPanResponderRelease: (_event, gesture) => {
-      if (gesture.dx > 40 || gesture.vx > 0.3) back();
-    },
-  });
+  // Gesture handler rather than PanResponder: the drag runs on the UI thread,
+  // so it keeps up with the finger even while this thread is laying out a
+  // hundred and fifty chapters. `activeOffsetX` and `failOffsetY` do the
+  // claiming that a hand-written responder was doing badly — sideways wins,
+  // downwards goes to the list, and neither has to be perfectly straight.
+  const { width } = useWindowDimensions();
+  const reduced = useReducedMotion();
+  const drag = useSharedValue(0);
+  const travelling = useAnimatedStyle(() => ({ transform: [{ translateX: drag.value }] }));
+
+  const atBooks = step === 'books';
+
+  const swipe = swipeBack(drag, width, atBooks || reduced, back);
 
   const onScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
     if (step === 'books') booksAt.current = event.nativeEvent.contentOffset.y;
@@ -92,7 +156,8 @@ export function PassagePalette({
   };
 
   return (
-    <View style={styles.root} {...swipe.panHandlers}>
+    <GestureDetector gesture={swipe}>
+    <Animated.View style={[styles.root, travelling]}>
       <View style={styles.crumbs}>
         <Crumb label="Books" active={step === 'books'} onPress={() => setStep('books')} />
         {step !== 'books' && meta ? (
@@ -223,7 +288,8 @@ export function PassagePalette({
           Hold a chapter to pick a verse
         </ThemedText>
       ) : null}
-    </View>
+    </Animated.View>
+    </GestureDetector>
   );
 }
 

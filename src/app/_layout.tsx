@@ -1,6 +1,7 @@
 import { Stack } from 'expo-router';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { StatusBar } from 'expo-status-bar';
-import { useColorScheme } from 'react-native';
+import { StyleSheet, useColorScheme } from 'react-native';
 
 import { AppNavigation, directionForNextScreen } from '@/components/navigation';
 import { animationForRoute } from '@/navigation/order.ts';
@@ -19,7 +20,11 @@ export default function RootLayout() {
   const theme = Colors[scheme];
 
   return (
-    <>
+    // Gesture handler needs a root of its own, and it has to sit above
+    // everything so a gesture anywhere reaches it. Unconditional: this wraps
+    // the same children on every screen, because a wrapper that comes and
+    // goes is a wrapper that rebuilds the tree beneath it.
+    <GestureHandlerRootView style={styles.root}>
       <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
       <AuthProvider>
         <AuthGate>
@@ -58,6 +63,8 @@ export default function RootLayout() {
           </ScriptureProvider>
         </AuthGate>
       </AuthProvider>
-    </>
+    </GestureHandlerRootView>
   );
 }
+
+const styles = StyleSheet.create({ root: { flex: 1 } });
