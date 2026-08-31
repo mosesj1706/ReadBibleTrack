@@ -83,6 +83,18 @@ Release build for a device cannot sign without one. `plugins/with-apple-team.js`
 puts it back as part of the same prebuild that loses it, so setting it by hand
 in Xcode is never the fix.
 
+Changing the identifier needs an App ID registered with Apple and a profile to
+match, and `expo run:ios` cannot create either — it fails with "No profiles for
+'…' were found". Only `xcodebuild -allowProvisioningUpdates` may register one,
+so a new identifier takes one build through `xcodebuild` directly before the
+ordinary script works again:
+
+    xcodebuild -workspace ios/ReadBibleTrack.xcworkspace -scheme ReadBibleTrack \
+      -configuration Release -destination "id=<device>" -allowProvisioningUpdates build
+
+Move `.env.local` aside for it, exactly as `scripts/build-ios-release.sh` does,
+or the embedded bundle points at a LAN address the phone cannot reach.
+
 `expo-modules-jsi` does not compile under Swift 6.2 / Xcode 26, and the fixes
 live in `node_modules`, so `npm install` throws them away and the next iOS
 build fails with seventeen errors. `scripts/patch-expo-swift.mjs` puts them
