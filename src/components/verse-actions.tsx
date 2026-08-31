@@ -30,7 +30,7 @@ export function VerseActions({
 }) {
   const theme = useTheme();
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
-  const { markOn, noteOn, highlight, star, write } = useMarks();
+  const { markOn, noteOn, highlight, star, write, share, shareNote } = useMarks();
   const { bookmark, mark: logRead } = useProgress();
 
   const range: VerseRange = { start: verseId, end: verseId };
@@ -102,6 +102,27 @@ export function VerseActions({
           }}
         />
       </View>
+
+      {/* Only offered once there is something to share. Sharing nothing is not
+          a state worth having, and an always-present toggle would suggest the
+          verse itself is being shared rather than what you made of it. */}
+      {existing || note ? (
+        <View style={styles.row}>
+          <Action
+            label={
+              (existing?.shared ?? note?.shared)
+                ? '◉ Shared with circle'
+                : '○ Share with circle'
+            }
+            active={(existing?.shared ?? note?.shared) === true}
+            onPress={() => {
+              const next = !(existing?.shared ?? note?.shared);
+              if (existing) share(existing.id, next);
+              if (note) shareNote(note.id, next);
+            }}
+          />
+        </View>
+      ) : null}
 
       {writing ? (
         <View style={styles.noteBox}>

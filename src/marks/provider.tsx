@@ -25,6 +25,8 @@ import {
   removeNote,
   saveNote,
   setMark,
+  setMarkShared,
+  setNoteShared,
   type Mark,
   type MarkColour,
   type Note,
@@ -39,6 +41,9 @@ type MarksValue = {
   readonly write: (range: VerseRange, body: string) => void;
   readonly forgetMark: (id: string) => void;
   readonly forgetNote: (id: string) => void;
+  /** Show a mark or a note to the circle, or take it back. */
+  readonly share: (id: string, shared: boolean) => void;
+  readonly shareNote: (id: string, shared: boolean) => void;
   /** What is marked on a range, if anything. */
   readonly markOn: (range: VerseRange) => Mark | undefined;
   readonly noteOn: (range: VerseRange) => Note | undefined;
@@ -86,6 +91,20 @@ export function MarksProvider({ children }: { readonly children: ReactNode }) {
     [refresh],
   );
 
+  const share = useCallback(
+    (id: string, shared: boolean) => {
+      void setMarkShared(id, shared).then(refresh);
+    },
+    [refresh],
+  );
+
+  const shareNote = useCallback(
+    (id: string, shared: boolean) => {
+      void setNoteShared(id, shared).then(refresh);
+    },
+    [refresh],
+  );
+
   const forgetMark = useCallback(
     (id: string) => {
       void removeMark(id).then(refresh);
@@ -113,8 +132,12 @@ export function MarksProvider({ children }: { readonly children: ReactNode }) {
   );
 
   const value = useMemo(
-    () => ({ marks, notes, ready, highlight, star, write, forgetMark, forgetNote, markOn, noteOn }),
-    [marks, notes, ready, highlight, star, write, forgetMark, forgetNote, markOn, noteOn],
+    () => ({
+      marks, notes, ready,
+      highlight, star, write, share, shareNote,
+      forgetMark, forgetNote, markOn, noteOn,
+    }),
+    [marks, notes, ready, highlight, star, write, share, shareNote, forgetMark, forgetNote, markOn, noteOn],
   );
 
   return <MarksContext.Provider value={value}>{children}</MarksContext.Provider>;

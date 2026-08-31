@@ -304,6 +304,37 @@ describe('marking up a passage', () => {
     assert.deepEqual(stranger.data, [], 'Ruth is in no circle with Anna');
   });
 
+  test('the query the reader actually makes returns the circle and not yourself', async () => {
+    // pullCircleMarks() selects every visible mark and excludes its own rows,
+    // leaning entirely on the policy to decide what "visible" means. This is
+    // that query, run as Sam: he should get Anna's shared mark and none of
+    // his own, however many he has.
+    await sam.db.from('marks').insert({
+      user_id: sam.id,
+      start_id: 1_001_001,
+      end_id: 1_001_001,
+      colour: 'blue',
+      shared: true,
+    });
+
+    const seen = await sam.db
+      .from('marks')
+      .select('user_id, start_id, end_id, colour, starred')
+      .neq('user_id', sam.id);
+
+    assert.equal(seen.error, null, seen.error?.message ?? 'expected no error');
+    const owners = new Set((seen.data ?? []).map((row) => row.user_id));
+    assert.ok(!owners.has(sam.id), 'his own marks are excluded by the query');
+    assert.ok(owners.has(anna.id), "Anna's shared mark comes back");
+
+    // And the same query as someone outside the circle sees nothing of theirs.
+    const stranger = await ruth.db
+      .from('marks')
+      .select('user_id')
+      .neq('user_id', ruth.id);
+    assert.deepEqual(stranger.data, [], 'Ruth shares a circle with nobody');
+  });
+
   test('nobody can mark up a passage in your name', async () => {
     const { error } = await sam.db
       .from('marks')

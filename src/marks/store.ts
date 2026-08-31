@@ -28,12 +28,18 @@ export type Mark = VerseRange & {
   readonly id: string;
   readonly colour: MarkColour | undefined;
   readonly starred: boolean;
+  /**
+   * Whether the circle can see this. Off by default and never set by
+   * accident: a margin is a private place until its owner decides otherwise.
+   */
+  readonly shared: boolean;
   readonly createdAt: string;
 };
 
 export type Note = VerseRange & {
   readonly id: string;
   readonly body: string;
+  readonly shared: boolean;
   readonly createdAt: string;
   readonly updatedAt: string;
 };
@@ -72,6 +78,7 @@ type MarkRow = {
   end_id: number;
   colour: string | null;
   starred: number;
+  shared: number;
   created_at: string;
 };
 
@@ -81,6 +88,7 @@ const toMark = (row: MarkRow): Mark => ({
   end: row.end_id,
   colour: (row.colour as MarkColour | null) ?? undefined,
   starred: row.starred === 1,
+  shared: row.shared === 1,
   createdAt: row.created_at,
 });
 
@@ -88,7 +96,7 @@ const toMark = (row: MarkRow): Mark => ({
 export async function listMarks(): Promise<Mark[]> {
   const db = await ensure();
   const rows = await db.getAllAsync<MarkRow>(
-    'select id, start_id, end_id, colour, starred, created_at from marks order by created_at desc',
+    'select id, start_id, end_id, colour, starred, shared, created_at from marks order by created_at desc',
   );
   return rows.map(toMark);
 }
@@ -97,7 +105,7 @@ export async function listMarks(): Promise<Mark[]> {
 export async function marksIn(range: VerseRange): Promise<Mark[]> {
   const db = await ensure();
   const rows = await db.getAllAsync<MarkRow>(
-    `select id, start_id, end_id, colour, starred, created_at from marks
+    `select id, start_id, end_id, colour, starred, shared, created_at from marks
        where start_id <= ? and end_id >= ? order by start_id`,
     range.end,
     range.start,
@@ -116,7 +124,7 @@ export async function setMark(
 ): Promise<void> {
   const db = await ensure();
   const existing = await db.getFirstAsync<MarkRow>(
-    'select id, start_id, end_id, colour, starred, created_at from marks where start_id = ? and end_id = ?',
+    'select id, start_id, end_id, colour, starred, shared, created_at from marks where start_id = ? and end_id = ?',
     range.start,
     range.end,
   );
@@ -150,6 +158,23 @@ export async function setMark(
   );
 }
 
+/**
+ * Show a mark to the circle, or take it back.
+ *
+ * Separate from `setMark` on purpose: colour and star are what a mark *is*,
+ * sharing is who may see it, and conflating the two is how a highlight ends
+ * up shared because someone changed its colour.
+ */
+export async function setMarkShared(id: string, shared: boolean): Promise<void> {
+  const db = await ensure();
+  await db.runAsync('update marks set shared = ? where id = ?', shared ? 1 : 0, id);
+}
+
+export async function setNoteShared(id: string, shared: boolean): Promise<void> {
+  const db = await ensure();
+  await db.runAsync('update notes set shared = ? where id = ?', shared ? 1 : 0, id);
+}
+
 export async function removeMark(id: string): Promise<void> {
   const db = await ensure();
   await db.runAsync('delete from marks where id = ?', id);
@@ -160,6 +185,7 @@ type NoteRow = {
   start_id: number;
   end_id: number;
   body: string;
+  shared: number;
   created_at: string;
   updated_at: string;
 };
@@ -169,6 +195,7 @@ const toNote = (row: NoteRow): Note => ({
   start: row.start_id,
   end: row.end_id,
   body: row.body,
+  shared: row.shared === 1,
   createdAt: row.created_at,
   updatedAt: row.updated_at,
 });
@@ -177,7 +204,7 @@ const toNote = (row: NoteRow): Note => ({
 export async function listNotes(): Promise<Note[]> {
   const db = await ensure();
   const rows = await db.getAllAsync<NoteRow>(
-    'select id, start_id, end_id, body, created_at, updated_at from notes order by updated_at desc',
+    'select id, start_id, end_id, body, shared, created_at, updated_at from notes order by updated_at desc',
   );
   return rows.map(toNote);
 }
@@ -185,7 +212,7 @@ export async function listNotes(): Promise<Note[]> {
 export async function notesIn(range: VerseRange): Promise<Note[]> {
   const db = await ensure();
   const rows = await db.getAllAsync<NoteRow>(
-    `select id, start_id, end_id, body, created_at, updated_at from notes
+    `select id, start_id, end_id, body, shared, created_at, updated_at from notes
        where start_id <= ? and end_id >= ? order by start_id`,
     range.end,
     range.start,

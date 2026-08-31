@@ -66,9 +66,9 @@ export async function pushMine(): Promise<SyncResult> {
         end_id: mark.end,
         colour: mark.colour ?? null,
         starred: mark.starred,
-        // Sharing is opt-in and not yet exposed in the app, so nothing in a
-        // margin reaches the circle by accident.
-        shared: false,
+        // Whatever the owner chose. Off unless they said otherwise, and the
+        // read policy only lets a circle-mate see the ones that are on.
+        shared: mark.shared,
       })),
     );
     if (error) throw new Error(`Could not send highlights: ${error.message}`);
@@ -81,13 +81,74 @@ export async function pushMine(): Promise<SyncResult> {
         start_id: note.start,
         end_id: note.end,
         body: note.body,
-        shared: false,
+        shared: note.shared,
       })),
     );
     if (error) throw new Error(`Could not send notes: ${error.message}`);
   }
 
   return { reading: ranges.length, marks: marks.length, notes: notes.length };
+}
+
+export type CircleMark = {
+  readonly userId: string;
+  readonly start: number;
+  readonly end: number;
+  readonly colour: string | undefined;
+  readonly starred: boolean;
+};
+
+export type CircleNote = {
+  readonly userId: string;
+  readonly start: number;
+  readonly end: number;
+  readonly body: string;
+};
+
+/**
+ * The marks and notes the circle has chosen to show each other.
+ *
+ * There is no `shared` filter in these queries and there must not be one:
+ * `marks_read` already says a row is visible only if it is yours or shared by
+ * someone you share a circle with. Filtering here as well would look like the
+ * safeguard when it is only a convenience, and the day the two disagreed it
+ * would be the policy that was right.
+ *
+ * Your own rows come back too, and are dropped by the caller — the server
+ * cannot tell "mine" from "theirs" without being told who is asking, and it
+ * already knows.
+ */
+export async function pullCircleMarks(): Promise<CircleMark[]> {
+  const userId = await currentUser();
+  const { data, error } = await supabase
+    .from('marks')
+    .select('user_id, start_id, end_id, colour, starred')
+    .neq('user_id', userId);
+  if (error) throw new Error(`Could not read the circle's highlights: ${error.message}`);
+
+  return (data ?? []).map((row) => ({
+    userId: row.user_id as string,
+    start: row.start_id as number,
+    end: row.end_id as number,
+    colour: (row.colour as string | null) ?? undefined,
+    starred: Boolean(row.starred),
+  }));
+}
+
+export async function pullCircleNotes(): Promise<CircleNote[]> {
+  const userId = await currentUser();
+  const { data, error } = await supabase
+    .from('notes')
+    .select('user_id, start_id, end_id, body')
+    .neq('user_id', userId);
+  if (error) throw new Error(`Could not read the circle's notes: ${error.message}`);
+
+  return (data ?? []).map((row) => ({
+    userId: row.user_id as string,
+    start: row.start_id as number,
+    end: row.end_id as number,
+    body: row.body as string,
+  }));
 }
 
 export type MemberReading = {
