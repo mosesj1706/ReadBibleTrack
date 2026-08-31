@@ -13,8 +13,9 @@
  * the top, closes the panel and gives the chapter back.
  */
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { PanResponder, ScrollView, StyleSheet, View } from 'react-native';
+import type { NativeScrollEvent, NativeSyntheticEvent } from 'react-native';
 
 import { BOOKS, getBook } from '@/bible/canon.ts';
 import { SECTIONS, sectionOf } from '@/bible/sections.ts';
@@ -49,6 +50,12 @@ export function PassagePalette({
 
   const meta = getBook(chosenBook);
 
+  const scroller = useRef<ScrollView>(null);
+  // Where the list of books was left. Sixty-six books do not fit on a phone,
+  // so returning to the top of them is returning to the wrong place: the book
+  // you just came out of is the one you are most likely to want again.
+  const booksAt = useRef(0);
+
   const back = () => {
     if (step === 'verses') setStep('chapters');
     else if (step === 'chapters') setStep('books');
@@ -56,15 +63,33 @@ export function PassagePalette({
   };
 
   // Built each render rather than held in a ref, so `back` is never the
-  // version from a step ago. Claiming the gesture needs a decidedly sideways
-  // drag, or it would take swipes meant for the list scrolling underneath it.
+  // version from a step ago.
+  //
+  // Capture, so this is asked before the list underneath rather than after:
+  // the list claimed every drag that was not almost perfectly level, which is
+  // most of them, and the swipe only answered to a long deliberate one. The
+  // test is which way the drag is *going*, not how straight it is — a real
+  // finger wanders — and a flick counts as well as a long pull.
   const swipe = PanResponder.create({
-    onMoveShouldSetPanResponder: (_event, gesture) =>
-      gesture.dx > 12 && Math.abs(gesture.dy) < 10,
+    onMoveShouldSetPanResponderCapture: (_event, gesture) =>
+      gesture.dx > 8 && gesture.dx > Math.abs(gesture.dy) * 1.5,
     onPanResponderRelease: (_event, gesture) => {
-      if (gesture.dx > 56) back();
+      if (gesture.dx > 40 || gesture.vx > 0.3) back();
     },
   });
+
+  const onScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    if (step === 'books') booksAt.current = event.nativeEvent.contentOffset.y;
+  };
+
+  // The restore has to wait for the books to be laid out again, and the
+  // content changing size is the moment they are. No flag saying a restore is
+  // due: scrolling the books does not change the content's size, so the only
+  // time this fires on the book list is when the list has just come back.
+  const onContentSize = () => {
+    if (step !== 'books') return;
+    scroller.current?.scrollTo({ y: booksAt.current, animated: false });
+  };
 
   return (
     <View style={styles.root} {...swipe.panHandlers}>
@@ -92,7 +117,14 @@ export function PassagePalette({
         ) : null}
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
+      <ScrollView
+        ref={scroller}
+        onScroll={onScroll}
+        onContentSizeChange={onContentSize}
+        scrollEventThrottle={16}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scroll}
+      >
         {step === 'books' ? (
           <>
             {SECTIONS.map((section) => (
