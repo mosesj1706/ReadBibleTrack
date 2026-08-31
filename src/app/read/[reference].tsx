@@ -35,21 +35,33 @@ import { usePassage } from '@/scripture/provider';
 import { useMarks, MARK_TINTS } from '@/marks/provider';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
+/**
+ * Stepping to the next or previous chapter.
+ *
+ * A replace, so reading ten chapters in a row does not bury the way out under
+ * ten entries — going back from Genesis 10 should leave the reader, not walk
+ * you slowly home through nine chapters you have already read.
+ */
 function open(reference: string): void {
   router.replace({ pathname: '/read/[reference]', params: { reference } });
 }
 
-/** Jump from the palette: a book and chapter, optionally a verse within it. */
+/**
+ * Jumping from the palette: a book and chapter, optionally a verse.
+ *
+ * A push, unlike stepping. Choosing a book from a list is a deliberate move
+ * to somewhere else, and going back from it should return to what you were
+ * reading — not throw you out of the reader entirely, which is what a replace
+ * did: the chapter replaced itself, and back then landed on whatever had
+ * opened the reader in the first place, usually Today.
+ */
 function goTo(book: number, chapter: number, verse?: number): void {
   const name = getBook(book)?.name ?? 'Genesis';
-  open(verse ? `${name} ${chapter}:${verse}` : `${name} ${chapter}`);
+  const reference = verse ? `${name} ${chapter}:${verse}` : `${name} ${chapter}`;
+  router.push({ pathname: '/read/[reference]', params: { reference } });
 }
 
-/**
- * Leaving the reader. Chapter navigation uses `replace`, so the history is not
- * a trail of every chapter passed through — going back should land on Today,
- * not walk backwards through the reading.
- */
+/** Leaving the reader, for wherever it was entered from. */
 function leave(): void {
   if (router.canGoBack()) router.back();
   else router.replace('/');
@@ -165,7 +177,10 @@ export default function ReaderScreen() {
             style={styles.leave}
           >
             <ThemedText type="small" themeColor="accent">
-              ‹ Today
+              {/* Only says Today when that is where it goes. Coming from the
+                  reading list, or from a chapter jumped away from, it went
+                  somewhere else entirely while still promising Today. */}
+              {router.canGoBack() ? '‹ Back' : '‹ Today'}
             </ThemedText>
           </Pressable>
           {/* Translation belongs here, not on a home screen: it is changed
