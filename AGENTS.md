@@ -73,6 +73,16 @@ machine: Release, so the JavaScript is embedded, and pointed at the hosted
 project. A debug build fetches its JavaScript from Metro on every launch and
 is useless off the network.
 
+`ios/` and `android/` are generated and git-ignored: `app.json` is the only
+place the bundle identifier lives. It is `com.readbibletrack.app`, on both
+platforms, and it is permanent — the App Store, Play, push certificates and
+crash reports are all keyed to it.
+
+`expo prebuild` writes a fresh Xcode project with no `DEVELOPMENT_TEAM`, and a
+Release build for a device cannot sign without one. `plugins/with-apple-team.js`
+puts it back as part of the same prebuild that loses it, so setting it by hand
+in Xcode is never the fix.
+
 `expo-modules-jsi` does not compile under Swift 6.2 / Xcode 26, and the fixes
 live in `node_modules`, so `npm install` throws them away and the next iOS
 build fails with seventeen errors. `scripts/patch-expo-swift.mjs` puts them
