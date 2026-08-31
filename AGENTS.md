@@ -66,6 +66,23 @@ Two traps this schema has already hit, both worth remembering:
   until its roles are granted access. RLS decides which rows; `grant` decides
   whether the table exists at all.
 
+## Building for a phone
+
+`scripts/build-ios-release.sh` makes the build that runs away from this
+machine: Release, so the JavaScript is embedded, and pointed at the hosted
+project. A debug build fetches its JavaScript from Metro on every launch and
+is useless off the network.
+
+`expo-modules-jsi` does not compile under Swift 6.2 / Xcode 26, and the fixes
+live in `node_modules`, so `npm install` throws them away and the next iOS
+build fails with seventeen errors. `scripts/patch-expo-swift.mjs` puts them
+back and runs from `postinstall`. It is idempotent and silent when there is
+nothing to do, so when Expo ships a version that builds on its own, it simply
+stops applying and can be deleted along with the hook.
+
+CocoaPods needs `LANG` set to a UTF-8 locale or `pod install` dies inside
+`unicode_normalize` on a perfectly ordinary path.
+
 ## Things that must not change casually
 
 - Book numbering in `src/bible/canon.ts` is baked into every stored verse id.
