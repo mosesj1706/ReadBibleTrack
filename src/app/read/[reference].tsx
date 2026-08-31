@@ -21,6 +21,7 @@ import { fromVerseId } from '@/bible/verse-id.ts';
 import { chapterRange, nextChapter, previousChapter } from '@/bible/versification.ts';
 import { ChapterMarkings } from '@/components/chapter-markings';
 import { Animated, SlideIn, useCollapse } from '@/components/motion';
+import { setNextDirection } from '@/components/navigation';
 import { PassagePalette } from '@/components/passage-palette';
 import { ScriptureText } from '@/components/scripture-text';
 import { Glass, Ground, Page } from '@/components/surfaces';
@@ -38,12 +39,18 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 /**
  * Stepping to the next or previous chapter.
  *
- * A replace, so reading ten chapters in a row does not bury the way out under
- * ten entries — going back from Genesis 10 should leave the reader, not walk
- * you slowly home through nine chapters you have already read.
+ * A push, and it travels the way the arrow points: forward slides in from the
+ * right, back from the left. It used to replace, which kept the stack short
+ * but meant a back gesture skipped everything you had read and dropped you on
+ * Today — undoing the whole session rather than the last move.
+ *
+ * The cost of pushing is a stack that grows while you read. That is what the
+ * control in the corner is for: it leaves the reader outright rather than
+ * retreating through the chapters one at a time.
  */
-function open(reference: string): void {
-  router.replace({ pathname: '/read/[reference]', params: { reference } });
+function open(reference: string, travelling: 'forward' | 'back' = 'forward'): void {
+  setNextDirection(travelling === 'back' ? 'slide_from_left' : 'slide_from_right');
+  router.push({ pathname: '/read/[reference]', params: { reference } });
 }
 
 /**
@@ -58,12 +65,19 @@ function open(reference: string): void {
 function goTo(book: number, chapter: number, verse?: number): void {
   const name = getBook(book)?.name ?? 'Genesis';
   const reference = verse ? `${name} ${chapter}:${verse}` : `${name} ${chapter}`;
+  setNextDirection('slide_from_right');
   router.push({ pathname: '/read/[reference]', params: { reference } });
 }
 
-/** Leaving the reader, for wherever it was entered from. */
+/**
+ * Leaving the reader entirely, however many chapters deep you are.
+ *
+ * `dismissAll` rather than `back`, because back now steps one chapter at a
+ * time — which is what it should do, and which would make this button take
+ * thirty taps after thirty chapters.
+ */
 function leave(): void {
-  if (router.canGoBack()) router.back();
+  if (router.canDismiss()) router.dismissAll();
   else router.replace('/');
 }
 
@@ -177,10 +191,10 @@ export default function ReaderScreen() {
             style={styles.leave}
           >
             <ThemedText type="small" themeColor="accent">
-              {/* Only says Today when that is where it goes. Coming from the
-                  reading list, or from a chapter jumped away from, it went
-                  somewhere else entirely while still promising Today. */}
-              {router.canGoBack() ? '‹ Back' : '‹ Today'}
+              {/* "Close" rather than "Back": the swipe steps back a chapter,
+                  this leaves the reader. Calling both of them Back would name
+                  two different things the same. */}
+              {router.canDismiss() ? '‹ Close' : '‹ Today'}
             </ThemedText>
           </Pressable>
           {/* Translation belongs here, not on a home screen: it is changed
@@ -205,7 +219,7 @@ export default function ReaderScreen() {
             hint={previous ? formatReference(chapterRange(previous.book, previous.chapter)!) : undefined}
             onPress={
               previous
-                ? () => open(formatReference(chapterRange(previous.book, previous.chapter)!))
+                ? () => open(formatReference(chapterRange(previous.book, previous.chapter)!), 'back')
                 : undefined
             }
           />
@@ -216,7 +230,9 @@ export default function ReaderScreen() {
             label="›"
             hint={next ? formatReference(chapterRange(next.book, next.chapter)!) : undefined}
             onPress={
-              next ? () => open(formatReference(chapterRange(next.book, next.chapter)!)) : undefined
+              next
+                ? () => open(formatReference(chapterRange(next.book, next.chapter)!), 'forward')
+                : undefined
             }
           />
         </Animated.View>

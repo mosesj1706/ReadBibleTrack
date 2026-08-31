@@ -47,6 +47,14 @@ export function directionForNextScreen(): Slide {
   return pendingDirection;
 }
 
+/**
+ * For anywhere outside the tab bar that knows which way it is travelling —
+ * the reader's chapter arrows, which move backwards as often as forwards.
+ */
+export function setNextDirection(slide: Slide): void {
+  pendingDirection = slide;
+}
+
 /** Screens that own the whole window. */
 function isImmersive(pathname: string): boolean {
   return pathname.startsWith('/read');
