@@ -32,7 +32,7 @@ import {
   withTiming,
   type SharedValue,
 } from 'react-native-reanimated';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 
 import { BOOKS, getBook } from '@/bible/canon.ts';
@@ -64,7 +64,9 @@ function swipeBack(
   offset: SharedValue<number>,
   rest: number,
   pane: number,
+  exit: number,
   atStart: boolean,
+  instant: boolean,
   back: () => void,
 ) {
   return Gesture.Pan()
@@ -81,11 +83,20 @@ function swipeBack(
         return;
       }
       // At the first step the track has nowhere further left to go: what is
-      // behind the panel is the chapter, and closing the panel is what shows
-      // it. The panel has its own way of leaving.
+      // behind the panel is the chapter, and the panel leaving is what shows
+      // it. It carries on out under its own momentum and closes when it has
+      // gone — closing on release instead put it back where it started for
+      // the frame before it vanished, which is the jump at the end of the
+      // gesture.
       if (atStart) {
-        offset.value = rest;
-        runOnJS(back)();
+        if (instant) {
+          offset.value = rest;
+          runOnJS(back)();
+          return;
+        }
+        offset.value = withTiming(exit, Quick, (done) => {
+          if (done) runOnJS(back)();
+        });
         return;
       }
       // Straight to where the previous step rests, so nothing has to be put
@@ -130,13 +141,20 @@ export function PassagePalette({
   // The panel's own width, which the panes are cut to. Measured rather than
   // assumed: this is a drawer on a phone and a column on a desktop.
   const [pane, setPane] = useState(0);
+  // How far the panel has to go to be gone, which is wider than the panel.
+  const window = useWindowDimensions();
   const index = STEPS.indexOf(step);
   const rest = -index * pane;
 
   const reduced = useReducedMotion();
   const offset = useSharedValue(0);
-  const track = useAnimatedStyle(() => ({ transform: [{ translateX: offset.value }] }));
-  // At the first step the track cannot move, so the panel itself does.
+  // One of these moves at a time. At the first step the panel travels and the
+  // track holds still; deeper in, the panel holds still and the track travels.
+  // Both reading the offset meant the contents moved twice as far as the panel
+  // carrying them.
+  const track = useAnimatedStyle(() => ({
+    transform: [{ translateX: index === 0 ? 0 : offset.value }],
+  }));
   const panel = useAnimatedStyle(() => ({
     transform: [{ translateX: index === 0 ? offset.value : 0 }],
   }));
@@ -152,7 +170,7 @@ export function PassagePalette({
     else onBack?.();
   };
 
-  const swipe = swipeBack(offset, rest, pane, index === 0 || reduced, back);
+  const swipe = swipeBack(offset, rest, pane, window.width, index === 0, reduced, back);
 
   return (
     <Panel style={[styles.root, panel]}>

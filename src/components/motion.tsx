@@ -15,6 +15,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import {
   AccessibilityInfo,
   Pressable,
+  useWindowDimensions,
   type LayoutChangeEvent,
   type StyleProp,
   type ViewStyle,
@@ -242,7 +243,7 @@ export function useCollapse(offset: SharedValue<number>, height: number) {
  * Compiler will not allow a shared value to be written from a function created
  * during render, and a gesture is configured by exactly such functions.
  */
-function swipeAway(offset: SharedValue<number>, away: () => void) {
+function swipeAway(offset: SharedValue<number>, exit: number, instant: boolean, away: () => void) {
   return Gesture.Pan()
     .activeOffsetX(10)
     .failOffsetY([-14, 14])
@@ -251,8 +252,17 @@ function swipeAway(offset: SharedValue<number>, away: () => void) {
     })
     .onEnd((event) => {
       if (event.translationX > 40 || event.velocityX > 300) {
-        offset.value = 0;
-        runOnJS(away)();
+        if (instant) {
+          offset.value = 0;
+          runOnJS(away)();
+          return;
+        }
+        // Out under its own momentum, and gone before it is unmounted. Calling
+        // away on release instead put the panel back where it started for the
+        // frame before it vanished — the jump at the end of the gesture.
+        offset.value = withTiming(exit, Quick, (done) => {
+          if (done) runOnJS(away)();
+        });
         return;
       }
       offset.value = withSpring(0, Settle);
@@ -268,9 +278,11 @@ export function SwipeAway({
   readonly onAway: () => void;
   readonly style?: StyleProp<ViewStyle>;
 }) {
+  const { width } = useWindowDimensions();
+  const reduced = useReducedMotion();
   const offset = useSharedValue(0);
   const travelling = useAnimatedStyle(() => ({ transform: [{ translateX: offset.value }] }));
-  const gesture = swipeAway(offset, onAway);
+  const gesture = swipeAway(offset, width, reduced, onAway);
 
   return (
     <GestureDetector gesture={gesture}>
