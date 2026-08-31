@@ -225,7 +225,12 @@ export default function ReaderScreen() {
   }
 
   const palette = (
-    <PassagePalette book={at.book} chapter={at.chapter} onPick={(b, c, v) => { setDrawer('none'); goTo(b, c, v); }} />
+    <PassagePalette
+      book={at.book}
+      chapter={at.chapter}
+      onPick={(b, c, v) => { setDrawer('none'); goTo(b, c, v); }}
+      onBack={() => setDrawer('none')}
+    />
   );
   const markings = <ChapterMarkings range={range} onJump={(id) => setSelected(id)} />;
 

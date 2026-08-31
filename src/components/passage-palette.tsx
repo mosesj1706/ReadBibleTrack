@@ -5,10 +5,16 @@
  * then that chapter's verses. Chapters and verses are grids rather than lists
  * because they are numbers — a grid is scannable in a way a column of "17, 18,
  * 19" never is, and Psalm 119 has 176 of them.
+ *
+ * The steps are state, not screens, so there is no stack for a back gesture to
+ * pop — and this panel sits over the chapter, where the system gesture is
+ * turned off so it cannot take the whole reader away underneath it. A swipe
+ * here is therefore handled here: it walks back up the three steps and, from
+ * the top, closes the panel and gives the chapter back.
  */
 
 import { useState } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { PanResponder, ScrollView, StyleSheet, View } from 'react-native';
 
 import { BOOKS, getBook } from '@/bible/canon.ts';
 import { SECTIONS, sectionOf } from '@/bible/sections.ts';
@@ -25,11 +31,14 @@ export function PassagePalette({
   book,
   chapter,
   onPick,
+  onBack,
 }: {
   /** Where the reader currently is, so it can be shown as selected. */
   readonly book: number;
   readonly chapter: number;
   readonly onPick: (book: number, chapter: number, verse?: number) => void;
+  /** Swiping back from the list of books, which is as far back as this goes. */
+  readonly onBack?: () => void;
 }) {
   const theme = useTheme();
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
@@ -40,8 +49,25 @@ export function PassagePalette({
 
   const meta = getBook(chosenBook);
 
+  const back = () => {
+    if (step === 'verses') setStep('chapters');
+    else if (step === 'chapters') setStep('books');
+    else onBack?.();
+  };
+
+  // Built each render rather than held in a ref, so `back` is never the
+  // version from a step ago. Claiming the gesture needs a decidedly sideways
+  // drag, or it would take swipes meant for the list scrolling underneath it.
+  const swipe = PanResponder.create({
+    onMoveShouldSetPanResponder: (_event, gesture) =>
+      gesture.dx > 12 && Math.abs(gesture.dy) < 10,
+    onPanResponderRelease: (_event, gesture) => {
+      if (gesture.dx > 56) back();
+    },
+  });
+
   return (
-    <View style={styles.root}>
+    <View style={styles.root} {...swipe.panHandlers}>
       <View style={styles.crumbs}>
         <Crumb label="Books" active={step === 'books'} onPress={() => setStep('books')} />
         {step !== 'books' && meta ? (
