@@ -14,6 +14,8 @@
 
 import { openDatabaseAsync, type SQLiteDatabase } from 'expo-sqlite';
 
+import { additionsFrom } from './merge.ts';
+
 import {
   normaliseRanges,
   subtractRanges,
@@ -120,6 +122,40 @@ export async function markUnread(range: VerseRange): Promise<void> {
       );
     }
   });
+}
+
+/**
+ * Fold someone else's copy of *your own* log into this device's.
+ *
+ * A union, not a replace. Reading is something you did, and two devices each
+ * know part of the truth: a phone read on the train and a browser read at
+ * home are both real, and neither should erase the other. Only the parts the
+ * device does not already cover are inserted, so syncing twice adds nothing
+ * the second time.
+ *
+ * The limitation is unmarking. If a chapter is unmarked here and the other
+ * device still has it, the next merge brings it back — a union cannot tell
+ * "never read" from "read, then taken back". Fixing that needs the log to
+ * record removals rather than only additions, which is a different design.
+ */
+export async function mergeIn(incoming: readonly LoggedRange[]): Promise<number> {
+  const db = await progressDatabase();
+  // The arithmetic lives in `merge.ts`, where it is tested without a database.
+  const additions = additionsFrom(await loggedRanges(), incoming);
+
+  if (additions.length > 0) {
+    await db.withTransactionAsync(async () => {
+      for (const addition of additions) {
+        await db.runAsync(
+          'insert into reading_log (start_id, end_id, read_on) values (?, ?, ?)',
+          addition.start,
+          addition.end,
+          addition.readOn,
+        );
+      }
+    });
+  }
+  return additions.length;
 }
 
 /** Wipe the log. Exposed for a settings screen and for tests. */

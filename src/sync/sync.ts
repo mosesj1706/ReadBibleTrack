@@ -17,8 +17,8 @@
  * so a bug in this file cannot leak someone else's reading.
  */
 
-import { loggedRanges } from '@/progress/store';
-import { listMarks, listNotes } from '@/marks/store';
+import { loggedRanges, mergeIn } from '@/progress/store';
+import { listMarks, listNotes, mergeMarks, mergeNotes } from '@/marks/store';
 import { supabase } from '@/supabase/client';
 
 export type SyncResult = {
@@ -88,6 +88,70 @@ export async function pushMine(): Promise<SyncResult> {
   }
 
   return { reading: ranges.length, marks: marks.length, notes: notes.length };
+}
+
+/**
+ * Everything of yours that is on the server, folded into this device.
+ *
+ * This is what makes a second device possible. The push is a replace, so
+ * without a pull first, opening the app on a phone would send its empty log
+ * up and wipe what the browser had recorded. Pulling and merging before
+ * pushing means the server ends up holding the union, and the next device to
+ * sync receives it.
+ *
+ * Hence the order in `syncNow`, which is not an implementation detail: pull,
+ * merge, then push. Reversed, it destroys data.
+ */
+export async function pullMine(): Promise<{ reading: number; marks: number; notes: number }> {
+  const userId = await currentUser();
+
+  const [reading, marks, notes] = await Promise.all([
+    supabase.from('reading_log').select('start_id, end_id, read_on').eq('user_id', userId),
+    supabase.from('marks').select('start_id, end_id, colour, starred, shared').eq('user_id', userId),
+    supabase.from('notes').select('start_id, end_id, body, shared').eq('user_id', userId),
+  ]);
+  for (const result of [reading, marks, notes]) {
+    if (result.error) throw new Error(`Could not read your own copy: ${result.error.message}`);
+  }
+
+  const addedReading = await mergeIn(
+    (reading.data ?? []).map((row) => ({
+      start: row.start_id as number,
+      end: row.end_id as number,
+      readOn: row.read_on as string,
+    })),
+  );
+  const addedMarks = await mergeMarks(
+    (marks.data ?? []).map((row) => ({
+      start: row.start_id as number,
+      end: row.end_id as number,
+      colour: (row.colour as string | null) ?? null,
+      starred: Boolean(row.starred),
+      shared: Boolean(row.shared),
+    })),
+  );
+  const addedNotes = await mergeNotes(
+    (notes.data ?? []).map((row) => ({
+      start: row.start_id as number,
+      end: row.end_id as number,
+      body: row.body as string,
+      shared: Boolean(row.shared),
+    })),
+  );
+
+  return { reading: addedReading, marks: addedMarks, notes: addedNotes };
+}
+
+/**
+ * Bring this device level with the server, in that order.
+ *
+ * Pull first so the push that follows sends the union rather than whatever
+ * this device happened to know on its own.
+ */
+export async function syncNow(): Promise<{ pulled: Awaited<ReturnType<typeof pullMine>>; pushed: SyncResult }> {
+  const pulled = await pullMine();
+  const pushed = await pushMine();
+  return { pulled, pushed };
 }
 
 export type CircleMark = {

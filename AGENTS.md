@@ -83,6 +83,27 @@ stops applying and can be deleted along with the hook.
 CocoaPods needs `LANG` set to a UTF-8 locale or `pod install` dies inside
 `unicode_normalize` on a perfectly ordinary path.
 
+## Syncing
+
+The push replaces this person's rows on the server, so **a device must pull
+before it pushes** — `syncNow` does the two in that order and reversing them
+destroys data: a second device would send its empty log up and wipe the
+first's.
+
+Merging is a union, and only ever adds. The arithmetic is in
+`progress/merge.ts`, kept apart from the store so `node --test` can cover it
+without a database — that file imports relatively with a `.ts` extension for
+the same reason `src/bible/` does.
+
+What a union cannot do is unmarking. Take a chapter back on one device and
+the next merge brings it back from the other, because nothing distinguishes
+"never read" from "read, then undone". Fixing that means recording removals,
+not just additions.
+
+Marks merge on the range they cover, not on their id: a mark's id is local to
+the device that made it and the server assigns its own, so there is nothing
+else stable to match on.
+
 ## Things that must not change casually
 
 - Book numbering in `src/bible/canon.ts` is baked into every stored verse id.

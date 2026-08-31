@@ -175,6 +175,69 @@ export async function setNoteShared(id: string, shared: boolean): Promise<void> 
   await db.runAsync('update notes set shared = ? where id = ?', shared ? 1 : 0, id);
 }
 
+/**
+ * Fold your own marks from another device into this one.
+ *
+ * Identified by the range they cover, because a mark's id is local to the
+ * device that made it — the server assigns its own — so there is nothing
+ * stable to match on but the verses. A range this device already marks is
+ * left exactly as it is: whatever colour it has here wins, rather than the
+ * two devices taking turns to recolour each other.
+ */
+export async function mergeMarks(
+  incoming: readonly { start: number; end: number; colour: string | null; starred: boolean; shared: boolean }[],
+): Promise<number> {
+  const db = await ensure();
+  const mine = await listMarks();
+  const known = new Set(mine.map((mark) => `${mark.start}-${mark.end}`));
+  let added = 0;
+
+  for (const mark of incoming) {
+    if (known.has(`${mark.start}-${mark.end}`)) continue;
+    if (!mark.colour && !mark.starred) continue;
+    await db.runAsync(
+      'insert into marks (id, start_id, end_id, colour, starred, shared, created_at) values (?, ?, ?, ?, ?, ?, ?)',
+      randomUUID(),
+      mark.start,
+      mark.end,
+      mark.colour,
+      mark.starred ? 1 : 0,
+      mark.shared ? 1 : 0,
+      new Date().toISOString(),
+    );
+    known.add(`${mark.start}-${mark.end}`);
+    added += 1;
+  }
+  return added;
+}
+
+export async function mergeNotes(
+  incoming: readonly { start: number; end: number; body: string; shared: boolean }[],
+): Promise<number> {
+  const db = await ensure();
+  const mine = await listNotes();
+  const known = new Set(mine.map((note) => `${note.start}-${note.end}`));
+  let added = 0;
+
+  for (const note of incoming) {
+    if (known.has(`${note.start}-${note.end}`)) continue;
+    const now = new Date().toISOString();
+    await db.runAsync(
+      'insert into notes (id, start_id, end_id, body, shared, created_at, updated_at) values (?, ?, ?, ?, ?, ?, ?)',
+      randomUUID(),
+      note.start,
+      note.end,
+      note.body,
+      note.shared ? 1 : 0,
+      now,
+      now,
+    );
+    known.add(`${note.start}-${note.end}`);
+    added += 1;
+  }
+  return added;
+}
+
 export async function removeMark(id: string): Promise<void> {
   const db = await ensure();
   await db.runAsync('delete from marks where id = ?', id);

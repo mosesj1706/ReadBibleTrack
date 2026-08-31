@@ -27,6 +27,8 @@ type ProgressValue = {
   /** Where reading stopped, so it can be picked up again. */
   readonly bookmark: VerseId | undefined;
   readonly ready: boolean;
+  /** Re-read from the device, after a sync has written to it. */
+  readonly refresh: () => void;
   readonly mark: (range: VerseRange) => void;
   readonly unmark: (range: VerseRange) => void;
 };
@@ -71,8 +73,8 @@ export function ProgressProvider({ children }: { readonly children: ReactNode })
   );
 
   const value = useMemo(
-    () => ({ ranges, bookmark, ready, mark, unmark }),
-    [ranges, bookmark, ready, mark, unmark],
+    () => ({ ranges, bookmark, ready, mark, unmark, refresh: () => void refresh() }),
+    [ranges, bookmark, ready, mark, unmark, refresh],
   );
 
   return <ProgressContext.Provider value={value}>{children}</ProgressContext.Provider>;

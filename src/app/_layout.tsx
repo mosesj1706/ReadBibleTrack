@@ -7,6 +7,7 @@ import { Colors } from '@/constants/theme';
 import { AuthGate } from '@/auth/gate';
 import { AuthProvider } from '@/auth/provider';
 import { CircleProvider } from '@/circles/provider';
+import { SyncOnStart } from '@/sync/on-start';
 import { MarksProvider } from '@/marks/provider';
 import { PlanProvider } from '@/plans/provider';
 import { ProgressProvider } from '@/progress/provider';
@@ -26,6 +27,7 @@ export default function RootLayout() {
               <PlanProvider>
                 <MarksProvider>
                   <CircleProvider>
+                  <SyncOnStart />
                   <AppNavigation>
                     <Stack
                       // A function, not an object: it is evaluated as each

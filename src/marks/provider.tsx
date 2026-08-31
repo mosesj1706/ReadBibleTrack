@@ -36,6 +36,8 @@ type MarksValue = {
   readonly marks: readonly Mark[];
   readonly notes: readonly Note[];
   readonly ready: boolean;
+  /** Re-read from the device, after a sync has written to it. */
+  readonly refresh: () => void;
   readonly highlight: (range: VerseRange, colour: MarkColour | undefined) => void;
   readonly star: (range: VerseRange, starred: boolean) => void;
   readonly write: (range: VerseRange, body: string) => void;
@@ -136,8 +138,9 @@ export function MarksProvider({ children }: { readonly children: ReactNode }) {
       marks, notes, ready,
       highlight, star, write, share, shareNote,
       forgetMark, forgetNote, markOn, noteOn,
+      refresh: () => void refresh(),
     }),
-    [marks, notes, ready, highlight, star, write, share, shareNote, forgetMark, forgetNote, markOn, noteOn],
+    [marks, notes, ready, highlight, star, write, share, shareNote, forgetMark, forgetNote, markOn, noteOn, refresh],
   );
 
   return <MarksContext.Provider value={value}>{children}</MarksContext.Provider>;
