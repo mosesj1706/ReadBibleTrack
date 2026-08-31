@@ -7,7 +7,7 @@
  * already forgiving about how people write one.
  */
 
-import { Stack, router, useLocalSearchParams } from 'expo-router';
+import { Stack, router, useLocalSearchParams, useNavigation } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
 import type { ScrollView } from 'react-native';
@@ -146,6 +146,23 @@ export default function ReaderScreen() {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const { marks, notes: written } = useMarks();
   const [selected, setSelected] = useState<number | undefined>();
+
+  // A back gesture should close whatever is open on top of the chapter before
+  // it closes the chapter. The books panel and the verse sheet are overlays
+  // rather than screens, so without this the swipe went straight past them and
+  // out of the reader — you opened the book list, swiped, and landed on Today
+  // having lost your place.
+  const navigation = useNavigation();
+  useEffect(() => {
+    const stop = navigation.addListener('beforeRemove', (event) => {
+      if (drawer === 'none' && selected === undefined) return;
+      event.preventDefault();
+      setDrawer('none');
+      setSelected(undefined);
+    });
+    return stop;
+  }, [navigation, drawer, selected]);
+
 
   // A verse is marked when a mark's range covers it, so a highlight over
   // several verses paints all of them.
