@@ -54,3 +54,6 @@ shots/
 
 # Browser-automation scratch from local UI checks
 .playwright-mcp/
+
+# Xcode archives and exported builds, made by scripts/upload-testflight.sh.
+build/
