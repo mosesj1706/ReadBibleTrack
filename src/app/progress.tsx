@@ -110,7 +110,14 @@ export default function ProgressScreen() {
                 }}
                 asChild
               >
-                <Pressable accessibilityRole="link" style={[styles.carryOn, { borderColor: theme.border }]}>
+                <Pressable
+                  accessibilityRole="link"
+                  // Flattened, not an array. `Link asChild` clones its child through
+                  // expo-router's Slot, which refuses an array of styles outright —
+                  // and it throws while rendering, so the whole screen goes rather
+                  // than the one control.
+                  style={StyleSheet.flatten([styles.carryOn, { borderColor: theme.border }])}
+                >
                   <ThemedText type="smallBold" themeColor="accent">
                     Carry on with {formatReference({ start: carryOn, end: carryOn })} ›
                   </ThemedText>
