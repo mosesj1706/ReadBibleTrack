@@ -7,6 +7,10 @@ test('the privacy policy is readable without an account', () => {
   assert.equal(isPublicRoute('/privacy'), true);
 });
 
+test('so is support — the people who need it are the ones who cannot sign in', () => {
+  assert.equal(isPublicRoute('/support'), true);
+});
+
 test('everything else is behind the gate', () => {
   for (const path of ['/', '/progress', '/marked', '/circle', '/profile']) {
     assert.equal(isPublicRoute(path), false, `${path} should need signing in`);

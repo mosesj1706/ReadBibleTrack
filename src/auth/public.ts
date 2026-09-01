@@ -13,7 +13,7 @@
  * change with a test beside it rather than an edit inside a conditional.
  */
 
-const PUBLIC = ['/privacy'];
+const PUBLIC = ['/privacy', '/support'];
 
 export function isPublicRoute(pathname: string): boolean {
   return PUBLIC.some((route) => pathname === route || pathname.startsWith(`${route}/`));
