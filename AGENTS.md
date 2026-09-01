@@ -56,6 +56,12 @@ send mail as you.
 `config push` sends the whole file, so read the diff before running it against
 production.
 
+The site is `https://readbibletrack.com`, served by the same CloudFront
+distribution as before through an ACM certificate in **us-east-1** — CloudFront
+will not accept one from anywhere else. The old `d18297uaokzo4d.cloudfront.net`
+still works and is deliberately still in `additional_redirect_urls`, so a link
+someone already has does not break.
+
 Mail is sent as `noreply@readbibletrack.com`, and the domain is why it arrives
 at all. Sending as a `@gmail.com` address through SES fails SPF — Google's SPF
 lists Google's servers, not Amazon's — and cannot be DKIM-signed, because only

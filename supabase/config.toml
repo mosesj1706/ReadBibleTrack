@@ -159,11 +159,13 @@ enabled = true
 # The hosted site, not a localhost port. `config push` sends this file to
 # production, so a development default left here would point the real
 # project's auth at a machine that is not on the internet.
-site_url = "https://d18297uaokzo4d.cloudfront.net"
+site_url = "https://readbibletrack.com"
 # The public URL that Auth serves on. Defaults to the API external URL with `/auth/v1` appended.
 # external_url = ""
 # A list of *exact* URLs that auth providers are permitted to redirect to post authentication.
 additional_redirect_urls = [
+  "https://readbibletrack.com",
+  "https://www.readbibletrack.com",
   "https://d18297uaokzo4d.cloudfront.net",
   "readbibletrack://",
   "exp://127.0.0.1:8081",
