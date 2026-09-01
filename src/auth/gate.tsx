@@ -6,14 +6,24 @@
  * rather than being bounced to the home screen having forgotten why they came.
  */
 
+import { usePathname } from 'expo-router';
 import type { ReactNode } from 'react';
 
 import { ProfileSetupScreen } from './profile-setup';
+import { isPublicRoute } from './public.ts';
 import { useAuth } from './provider';
 import { SignInScreen } from './sign-in';
 
 export function AuthGate({ children }: { readonly children: ReactNode }) {
+  const pathname = usePathname();
   const { session, profile, loading } = useAuth();
+
+  // Before the session is even looked at, and before the loading pause below.
+  // A privacy policy has to be readable by someone with no account — that is
+  // what it is for — and the static export renders every page with no session
+  // at all, so a gated one comes out of the build as a picture of the sign-in
+  // screen.
+  if (isPublicRoute(pathname)) return <>{children}</>;
 
   // Reading the stored session is quick; flashing the sign-in screen at
   // someone who is already signed in is not worth a spinner.

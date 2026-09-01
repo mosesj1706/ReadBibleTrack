@@ -20,6 +20,7 @@ import { canonSpan } from '@/bible/verse-id.ts';
 import { countVerses, progressThrough } from '@/bible/versification.ts';
 import { Animated, Settle, Tappable, useFill } from '@/components/motion';
 import { TABS, slideDirection, type Slide } from '@/navigation/order.ts';
+import { isPublicRoute } from '@/auth/public.ts';
 import { Glass, Ground } from '@/components/surfaces';
 import { ThemedText } from '@/components/themed-text';
 import { Fonts, MaxPageWidth, Radius, Spacing } from '@/constants/theme';
@@ -55,9 +56,15 @@ export function setNextDirection(slide: Slide): void {
   pendingDirection = slide;
 }
 
-/** Screens that own the whole window. */
+/**
+ * Screens that own the whole window.
+ *
+ * The reader, and the pages that can be reached without an account — a tab bar
+ * offering four screens that all demand signing in is not navigation, it is a
+ * row of locked doors.
+ */
 function isImmersive(pathname: string): boolean {
-  return pathname.startsWith('/read');
+  return pathname.startsWith('/read') || isPublicRoute(pathname);
 }
 
 export function AppNavigation({ children }: { readonly children: React.ReactNode }) {
