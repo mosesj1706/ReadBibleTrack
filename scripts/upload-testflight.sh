@@ -65,11 +65,21 @@ xcodebuild -workspace ios/ReadBibleTrack.xcworkspace -scheme ReadBibleTrack \
 # backend from a broken app, and by then it is on their phone.
 BUNDLE="$ARCHIVE/Products/Applications/ReadBibleTrack.app/main.jsbundle"
 HOST="$(printf '%s' "$EXPO_PUBLIC_SUPABASE_URL" | sed -e 's|https\{0,1\}://||' -e 's|/.*||')"
-if ! strings "$BUNDLE" | grep -q "$HOST"; then
+
+# Counted rather than `grep -q`, which is not a detail. `grep -q` exits the
+# moment it matches; that closes the pipe, `strings` dies of SIGPIPE, and under
+# `set -o pipefail` the pipeline reports failure — so a match reads as a miss.
+# The first check then refuses every correct archive, which is merely annoying.
+# The second fails the other way: it would go quiet exactly when it found a
+# local address, which is the one thing it exists to catch. `grep -c` reads to
+# the end, so nothing is killed early.
+FOUND_HOST="$(strings "$BUNDLE" | grep -c "$HOST" || true)"
+if [ "$FOUND_HOST" -eq 0 ]; then
   echo "✗ The archive does not contain $HOST. Refusing to upload it."
   exit 1
 fi
-if strings "$BUNDLE" | grep -qE "127\.0\.0\.1:54321|localhost:54321"; then
+FOUND_LOCAL="$(strings "$BUNDLE" | grep -cE "127\.0\.0\.1:54321|localhost:54321" || true)"
+if [ "$FOUND_LOCAL" -ne 0 ]; then
   echo "✗ The archive still points at a local Supabase. Refusing to upload it."
   exit 1
 fi

@@ -102,6 +102,14 @@ back and runs from `postinstall`. It is idempotent and silent when there is
 nothing to do, so when Expo ships a version that builds on its own, it simply
 stops applying and can be deleted along with the hook.
 
+A safety check written as `strings file | grep -q pattern` is inverted under
+`set -o pipefail`, which every script here uses. `grep -q` exits the moment it
+matches, that closes the pipe, `strings` dies of SIGPIPE, and the pipeline
+reports failure — so a match reads as a miss. It cost a refused upload once and
+would have cost more: the same check looking for a *local* address would have
+gone quiet exactly when it found one. Count with `grep -c`, which reads to the
+end.
+
 CocoaPods needs `LANG` set to a UTF-8 locale or `pod install` dies inside
 `unicode_normalize` on a perfectly ordinary path.
 
