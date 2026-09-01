@@ -56,6 +56,27 @@ send mail as you.
 `config push` sends the whole file, so read the diff before running it against
 production.
 
+Mail is sent as `noreply@readbibletrack.com`, and the domain is why it arrives
+at all. Sending as a `@gmail.com` address through SES fails SPF — Google's SPF
+lists Google's servers, not Amazon's — and cannot be DKIM-signed, because only
+Google holds keys for `gmail.com`. Both checks fail, DMARC fails with them, and
+a sign-in code lands in spam. There is no password to fall back on, so a code
+in spam is a person who cannot get into the app at all. No SES setting fixes
+this; only a domain you own.
+
+`readbibletrack.com` is registered through Route 53 in the same AWS account, so
+DNS and the sending identity live together. It carries three DKIM CNAMEs, an
+SPF record of `v=spf1 include:amazonses.com -all`, and DMARC at `p=none` with
+reports going to `readbibletrack@gmail.com`. The policy starts at `none` on
+purpose: tighten to `quarantine` once the reports show nothing legitimate
+failing, because going straight to `reject` silently kills your own mail if
+anything is misconfigured.
+
+Nothing *receives* mail at that domain — `noreply@` is a sending identity only,
+and a reply to a sign-in code goes nowhere. The address published in the
+privacy policy is `readbibletrack@gmail.com` for that reason, and it has to
+keep working: it is where someone exercises a right to have their data deleted.
+
 Two traps this schema has already hit, both worth remembering:
 
 - A `RETURNING` clause is evaluated before `AFTER INSERT` triggers fire. A
