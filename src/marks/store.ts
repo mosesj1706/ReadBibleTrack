@@ -324,3 +324,17 @@ export async function removeNote(id: string): Promise<void> {
   const db = await ensure();
   await db.runAsync('delete from notes where id = ?', id);
 }
+
+/**
+ * Wipe every mark and note on this device.
+ *
+ * For deleting an account. The push replaces this person's rows on the server
+ * from whatever the device holds, so a device that still remembers after the
+ * account is gone would put it all back the next time anyone signed in on it —
+ * deletion undone by a sync, silently.
+ */
+export async function forgetMarks(): Promise<void> {
+  const db = await ensure();
+  await db.runAsync('delete from marks');
+  await db.runAsync('delete from notes');
+}

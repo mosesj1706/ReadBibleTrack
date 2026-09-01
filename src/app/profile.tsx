@@ -32,7 +32,9 @@ export default function ProfileScreen() {
   const onScroll = useAnimatedScrollHandler((event) => {
     scrolled.value = event.contentOffset.y;
   });
-  const { session, profile, saveProfile, signOut } = useAuth();
+  const { session, profile, saveProfile, signOut, deleteAccount } = useAuth();
+  const [confirming, setConfirming] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const [name, setName] = useState(profile?.displayName ?? '');
   const [phone, setPhone] = useState(profile?.phone ?? '');
@@ -191,6 +193,65 @@ export default function ProfileScreen() {
               Sign out
             </ThemedText>
           </Pressable>
+
+          {/* Two taps, not one, and the second one says what it does rather
+              than "Confirm". Deletion cannot be undone, and this sits at the
+              foot of a screen someone scrolls to change their name. */}
+          {!confirming ? (
+            <Pressable
+              onPress={() => setConfirming(true)}
+              accessibilityRole="button"
+              style={styles.quiet}
+            >
+              <ThemedText type="small" themeColor="textFaint">
+                Delete my account
+              </ThemedText>
+            </Pressable>
+          ) : (
+            <Card style={styles.danger}>
+              <ThemedText type="smallBold">Delete your account?</ThemedText>
+              <ThemedText type="small" themeColor="textSecondary">
+                Your reading, your highlights, your notes and this account go
+                for good, on every device. It cannot be undone. A circle you
+                started stays with the people still in it.
+              </ThemedText>
+              <View style={styles.dangerRow}>
+                <Pressable
+                  onPress={() => setConfirming(false)}
+                  accessibilityRole="button"
+                  disabled={deleting}
+                  style={styles.quiet}
+                >
+                  <ThemedText type="smallBold" themeColor="accent">
+                    Keep it
+                  </ThemedText>
+                </Pressable>
+                <Pressable
+                  onPress={() => {
+                    setDeleting(true);
+                    setProblem(undefined);
+                    void deleteAccount()
+                      .catch((error: unknown) => {
+                        setProblem(error instanceof Error ? error.message : 'Could not delete it.');
+                        setConfirming(false);
+                      })
+                      .finally(() => setDeleting(false));
+                  }}
+                  accessibilityRole="button"
+                  disabled={deleting}
+                  style={[styles.destroy, { borderColor: theme.redLetter }]}
+                >
+                  {deleting ? (
+                    <ActivityIndicator color={theme.redLetter} />
+                  ) : (
+                    <ThemedText type="smallBold" style={{ color: theme.redLetter }}>
+                      Delete everything
+                    </ThemedText>
+                  )}
+                </Pressable>
+              </View>
+            </Card>
+          )}
         </Animated.ScrollView>
       </SafeAreaView>
     </Ground>
@@ -227,5 +288,21 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   quiet: { minHeight: 44, alignItems: 'center', justifyContent: 'center' },
+  danger: { gap: Spacing.two, marginTop: Spacing.two },
+  dangerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    flexWrap: 'wrap',
+    gap: Spacing.three,
+  },
+  destroy: {
+    minHeight: 44,
+    paddingHorizontal: Spacing.three,
+    borderRadius: Spacing.two,
+    borderWidth: StyleSheet.hairlineWidth,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   problem: { borderLeftWidth: 2, paddingLeft: Spacing.three, paddingVertical: Spacing.two },
 });

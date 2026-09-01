@@ -158,10 +158,19 @@ export async function mergeIn(incoming: readonly LoggedRange[]): Promise<number>
   return additions.length;
 }
 
-/** Wipe the log. Exposed for a settings screen and for tests. */
+/**
+ * Wipe the log and the bookmark. Exposed for a settings screen, for deleting
+ * an account, and for tests.
+ *
+ * The bookmark goes too. It is a verse someone was reading, which is the same
+ * kind of thing as the reading itself, and leaving it behind after "delete
+ * everything" would be a small lie told by a feature whose whole value is
+ * being believed.
+ */
 export async function forgetEverything(): Promise<void> {
   const db = await progressDatabase();
   await db.runAsync('delete from reading_log');
+  await db.runAsync('delete from bookmark');
 }
 
 /** Where reading stopped, if it ever started. */

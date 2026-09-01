@@ -520,6 +520,57 @@ describe('the queries the circle screen actually makes', () => {
   });
 });
 
+describe('deleting your own account', () => {
+  test('a circle you started stays with the people still in it', async () => {
+    // Anna starts a circle, Sam joins, Anna leaves for good. The circle is the
+    // whole point of the app; one person deleting their account must not
+    // dissolve a family's shared reading.
+    const { data: circle } = await anna.db
+      .from('circles')
+      .insert({ name: 'The kitchen table', created_by: anna.id })
+      .select('id, join_code')
+      .single();
+    assert.ok(circle, 'the circle was made');
+    await anna.db.from('circle_members').insert({ circle_id: circle.id, user_id: anna.id, role: 'owner' });
+    await sam.db.from('circle_members').insert({ circle_id: circle.id, user_id: sam.id });
+
+    const gone = await anna.db.rpc('delete_me');
+    assert.equal(gone.error, null, gone.error?.message ?? 'expected no error');
+
+    const { data: survived } = await sam.db.from('circles').select('id, created_by').eq('id', circle.id);
+    assert.equal(survived?.length, 1, 'the circle outlived the person who made it');
+    assert.equal(survived?.[0]?.created_by, sam.id, 'and Sam, who was still in it, now owns it');
+
+    const { data: role } = await sam.db
+      .from('circle_members')
+      .select('role')
+      .eq('circle_id', circle.id)
+      .eq('user_id', sam.id)
+      .single();
+    assert.equal(role?.role, 'owner');
+  });
+
+  test('everything of theirs goes with them', async () => {
+    const { data: left } = await sam.db.from('reading_log').select('id').eq('user_id', anna.id);
+    assert.deepEqual(left, [], 'Anna’s reading went when Anna did');
+  });
+
+  test('a circle with nobody left in it is not kept', async () => {
+    const { data: circle } = await ruth.db
+      .from('circles')
+      .insert({ name: 'On my own', created_by: ruth.id })
+      .select('id')
+      .single();
+    assert.ok(circle, 'the circle was made');
+    await ruth.db.from('circle_members').insert({ circle_id: circle.id, user_id: ruth.id, role: 'owner' });
+
+    await ruth.db.rpc('delete_me');
+
+    const { data } = await admin.from('circles').select('id').eq('id', circle.id);
+    assert.deepEqual(data, [], 'an empty circle is not anything any more');
+  });
+});
+
 describe('signed out', () => {
   const anon = createClient(API, ANON, { auth: { persistSession: false } });
 

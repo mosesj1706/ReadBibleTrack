@@ -18,6 +18,8 @@ import {
 } from 'react';
 
 import { supabase } from '@/supabase/client';
+import { forgetEverything } from '@/progress/store';
+import { forgetMarks } from '@/marks/store';
 
 export type Profile = {
   readonly id: string;
@@ -43,6 +45,11 @@ type AuthValue = {
     phone?: string | null;
   }) => Promise<void>;
   readonly signOut: () => Promise<void>;
+  /**
+   * Delete the account and everything in it, here and on the server. There is
+   * no undoing it and nothing is kept.
+   */
+  readonly deleteAccount: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthValue | undefined>(undefined);
@@ -176,8 +183,38 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
     setProfile(null);
   }, []);
 
+  const deleteAccount = useCallback(async () => {
+    // The server first. If it fails there is still an account and still the
+    // data, and the person can be told so — whereas wiping the device first
+    // and then failing would leave them signed in to an account whose reading
+    // this device had just thrown away.
+    const { error } = await supabase.rpc('delete_me');
+    if (error) throw readable(error, 'Could not delete the account.');
+
+    // Then the device, before signing out. The push replaces this person's
+    // rows on the server from whatever the device holds, so a device that
+    // still remembered would put it all back the next time anyone signed in
+    // here — deletion undone by a sync, silently.
+    await Promise.all([forgetEverything(), forgetMarks()]);
+
+    await supabase.auth.signOut();
+    setProfile(null);
+  }, []);
+
   const value = useMemo(
     () => ({
+      session,
+      profile,
+      loading,
+      offline,
+      sendCode,
+      deleteAccount,
+      verifyCode,
+      saveName,
+      saveProfile,
+      signOut,
+    }),
+    [
       session,
       profile,
       loading,
@@ -187,8 +224,8 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
       saveName,
       saveProfile,
       signOut,
-    }),
-    [session, profile, loading, offline, sendCode, verifyCode, saveName, saveProfile, signOut],
+      deleteAccount,
+    ],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
