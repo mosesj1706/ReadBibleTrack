@@ -175,12 +175,15 @@ export default function PrivacyScreen() {
                 Deletion is permanent and cannot be undone.
               </P>
               <P>
-                Write to {CONTACT} from the address you signed up with. In-app deletion is being
-                built and will replace this.
+                In the app: the You tab, at the foot, &ldquo;Delete my account&rdquo;. Or write to{' '}
+                {CONTACT} from the address you signed up with, if you cannot get in to do it
+                yourself.
               </P>
               <P>
                 Reading you have shared with a circle is removed along with everything else. A note
-                you shared is deleted too; it is yours.
+                you shared is deleted too; it is yours. A circle you started stays with the people
+                still in it, and passes to whoever has been in it longest — leaving should not
+                dissolve everyone else&rsquo;s reading.
               </P>
             </Section>
 
