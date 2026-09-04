@@ -84,7 +84,7 @@ export default function SupportScreen() {
                 about and worth fixing.
               </P>
               <P>
-                A code lasts ten minutes. Asking for a second one makes the first stop working, so
+                A code lasts an hour. Asking for a second one makes the first stop working, so
                 use the newest email in the list rather than the first.
               </P>
             </Section>
