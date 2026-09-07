@@ -18,7 +18,7 @@ import {
   useAnimatedScrollHandler,
   useSharedValue,
 } from 'react-native-reanimated';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { getBook } from '@/bible/canon.ts';
 import { sectionOf } from '@/bible/sections.ts';
@@ -102,6 +102,7 @@ function leave(routeNames: readonly string[]): void {
 export default function ReaderScreen() {
   const theme = useTheme();
   const { ranges, mark, unmark, keepPlace } = useProgress();
+  const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{ reference: string }>();
 
   // A reference may name any span; the reader shows the chapter it starts in.
@@ -403,9 +404,20 @@ export default function ReaderScreen() {
         {wide ? <Glass solid style={styles.side}>{markings}</Glass> : null}
         </View>
 
-        {/* One drawer at a time on a narrow screen. */}
+        {/* One drawer at a time on a narrow screen.
+
+            The top inset is applied to the drawer itself rather than left to
+            the SafeAreaView around it: this is absolutely positioned, and an
+            absolute child is laid out against its parent's edge, not inside
+            the parent's safe-area padding. On Android 15, which draws
+            edge-to-edge, that put the panel's rounded top under the clock. */}
         {!wide && drawer !== 'none' ? (
-          <View style={[styles.drawer, { pointerEvents: 'box-none' }]}>
+          <View
+            style={[
+              styles.drawer,
+              { paddingTop: insets.top + Spacing.three, pointerEvents: 'box-none' },
+            ]}
+          >
             <SlideIn
               visible
               fromX={drawer === 'palette' ? -40 : 40}

@@ -1,5 +1,6 @@
 import { Stack } from 'expo-router';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { StyleSheet, useColorScheme } from 'react-native';
 
@@ -25,6 +26,12 @@ export default function RootLayout() {
     // the same children on every screen, because a wrapper that comes and
     // goes is a wrapper that rebuilds the tree beneath it.
     <GestureHandlerRootView style={styles.root}>
+      {/* Nine screens use SafeAreaView, and without this provider every inset
+          it reports is zero. iOS hides that, because the library falls back to
+          the platform's own safe area there; Android does not, and Android 15
+          draws edge-to-edge, so the reader's panel slid up under the status
+          bar. One provider at the root rather than a correction per screen. */}
+      <SafeAreaProvider>
       <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
       <AuthProvider>
         <AuthGate>
@@ -63,6 +70,7 @@ export default function RootLayout() {
           </ScriptureProvider>
         </AuthGate>
       </AuthProvider>
+      </SafeAreaProvider>
     </GestureHandlerRootView>
   );
 }
