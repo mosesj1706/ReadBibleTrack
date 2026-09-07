@@ -14,7 +14,7 @@
         "//": "What sits under the icon. iOS truncates a home-screen label at about twelve characters, and ReadBibleTrack is fourteen — it rendered as ReadBibleTra… The App Store name stays the long one, where the words people search for are worth more than tidiness.",
         "CFBundleDisplayName": "RBT"
       },
-      "buildNumber": "4",
+      "buildNumber": "5",
       "config": {
         "usesNonExemptEncryption": false
       }
