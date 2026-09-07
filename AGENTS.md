@@ -203,8 +203,13 @@ into AsyncStorage, which on Android is SQLite:
       "insert or replace into catalystLocalStorage values('sb-127-auth-token','…');"
 
 Android 15+ forces edge-to-edge and logs `StatusBarModule: Ignored status bar
-change`. The screens handle it, but the reader's drawer draws under the status
-bar — cosmetic, nothing is obscured, and not yet fixed.
+change`. The reader's drawer used to draw under the clock, and the fix was not
+the obvious one: `SafeAreaView` needs a `SafeAreaProvider` above it or its
+insets are silently zero, but adding one changed nothing here, because the
+drawer is absolutely positioned and an absolute child is laid out against its
+parent's edge rather than inside the parent's safe-area padding. The inset is
+applied to the drawer itself. Measure the pixels when checking this sort of
+thing — by eye it looked fixed while the panel was still at y=52.
 
 ## Syncing
 
