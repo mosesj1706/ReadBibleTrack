@@ -46,6 +46,12 @@ enabled. Both live in `supabase/config.toml` and reach the hosted project
 through `supabase config push`, not through the dashboard — the dashboard and
 this file will fight over the same settings if you use both.
 
+A local stack started **without** `.smtp.local` sourced passes the literal
+string `env(SMTP_HOST)` through to GoTrue, and sign-in then fails with "Error
+sending magic link email". The SMTP block is not inert locally, whatever it
+looks like. `set -a; . ./.smtp.local; set +a` before `supabase start`, or use
+the admin API to mint a session instead of sending mail.
+
 The credentials come from the environment. Keep them in `.smtp.local` —
 git-ignored, and deliberately not named `.env`-anything, because Expo pulls
 every `.env*` at the project root into the bundler graph and then fails trying
@@ -158,6 +164,40 @@ end.
 
 CocoaPods needs `LANG` set to a UTF-8 locale or `pod install` dies inside
 `unicode_normalize` on a perfectly ordinary path.
+
+## Building for Android
+
+Nothing is installed by default. `brew install openjdk@17` and
+`brew install --cask android-commandlinetools` — the JDK as a *formula* rather
+than a cask, so it lands in `/opt/homebrew` and needs no password. Then:
+
+    export JAVA_HOME=/opt/homebrew/opt/openjdk@17
+    export ANDROID_HOME=/opt/homebrew/share/android-commandlinetools
+    export PATH="$JAVA_HOME/bin:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$ANDROID_HOME/emulator:$PATH"
+    yes | sdkmanager --licenses
+    sdkmanager --install "platform-tools" "platforms;android-36" "build-tools;36.0.0" \
+      "emulator" "system-images;android-36;google_apis;arm64-v8a"
+
+`compileSdk` is 36, from `expo-root-project`, not from anything in this repo.
+
+`expo run:android --device` takes the **AVD name**, not the adb id:
+`--device rbt`, never `--device emulator-5554`.
+
+The emulator cannot reach the host's `127.0.0.1`, so a local backend is
+invisible to it. `adb reverse tcp:54321 tcp:54321` bridges it without
+rebuilding — which matters because the Supabase URL is baked into the bundle at
+build time.
+
+`adb shell input tap|text|swipe` drives the UI, which makes Android far easier
+to test end to end than the iOS simulator. A session can be injected straight
+into AsyncStorage, which on Android is SQLite:
+
+    adb shell run-as com.readbibletrack.app sqlite3 databases/RKStorage \
+      "insert or replace into catalystLocalStorage values('sb-127-auth-token','…');"
+
+Android 15+ forces edge-to-edge and logs `StatusBarModule: Ignored status bar
+change`. The screens handle it, but the reader's drawer draws under the status
+bar — cosmetic, nothing is obscured, and not yet fixed.
 
 ## Syncing
 
