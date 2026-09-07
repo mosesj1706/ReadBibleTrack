@@ -21,7 +21,7 @@ import { ThemedText } from '@/components/themed-text';
 import { Fonts, MaxContentWidth, Spacing } from '@/constants/theme';
 
 /** Changed only when the policy itself changes, not when this file is edited. */
-const UPDATED = '1 September 2026';
+const UPDATED = '7 September 2026';
 
 /**
  * Deliberately not a personal address, and deliberately one that works today.
@@ -158,7 +158,7 @@ export default function PrivacyScreen() {
               <P>
                 On your device, so the app works without a signal, and on a server so it can reach
                 your other devices and your circle. The server is Supabase, which hosts the database
-                and handles sign-in. Sign-in emails are sent through Amazon Web Services. The website
+                and handles sign-in. Sign-in emails are sent through Resend. The website
                 is served by Amazon CloudFront. Those are suppliers doing this work for
                 ReadBibleTrack; none of them is given your data for their own purposes.
               </P>

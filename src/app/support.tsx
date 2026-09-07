@@ -97,9 +97,9 @@ export default function SupportScreen() {
                 them.
               </P>
               <P>
-                Taking a mark back on one device can be undone by another device syncing: reading
-                merges by adding, and nothing yet records that something was deliberately removed.
-                This is a known limit rather than a mystery.
+                Taking a mark back sticks, on every device. If you unmark a chapter on one and mark
+                the same one on another before they have synced, whichever synced last is the one
+                that counts.
               </P>
             </Section>
 
