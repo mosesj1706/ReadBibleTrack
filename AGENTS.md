@@ -62,21 +62,40 @@ will not accept one from anywhere else. The old `d18297uaokzo4d.cloudfront.net`
 still works and is deliberately still in `additional_redirect_urls`, so a link
 someone already has does not break.
 
+Mail goes through **Resend**, not SES. Amazon refused production access twice
+without saying why, and a refused SES account can only send to addresses
+verified one at a time — which for an app whose only way in is an emailed code
+means nobody but the developer can sign in. Resend approved immediately.
+`smtp.resend.com`, username the literal word `resend`, the API key as the
+password.
+
+SES is still fully configured and unused: its domain identity, DKIM,
+configuration set and bounce topic are all intact, so going back is one
+`config push`. The previous credentials are in `.smtp.local.ses-backup`.
+
 Mail is sent as `noreply@readbibletrack.com`, and the domain is why it arrives
-at all. Sending as a `@gmail.com` address through SES fails SPF — Google's SPF
-lists Google's servers, not Amazon's — and cannot be DKIM-signed, because only
+at all. Sending as a `@gmail.com` address fails SPF — Google's SPF lists
+Google's servers, not your provider's — and cannot be DKIM-signed, because only
 Google holds keys for `gmail.com`. Both checks fail, DMARC fails with them, and
 a sign-in code lands in spam. There is no password to fall back on, so a code
-in spam is a person who cannot get into the app at all. No SES setting fixes
-this; only a domain you own.
+in spam is a person who cannot get into the app at all. No provider setting
+fixes this; only a domain you own.
 
 `readbibletrack.com` is registered through Route 53 in the same AWS account, so
-DNS and the sending identity live together. It carries three DKIM CNAMEs, an
-SPF record of `v=spf1 include:amazonses.com -all`, and DMARC at `p=none` with
-reports going to `readbibletrack@gmail.com`. The policy starts at `none` on
-purpose: tighten to `quarantine` once the reports show nothing legitimate
-failing, because going straight to `reject` silently kills your own mail if
-anything is misconfigured.
+DNS and the sending identity live together. It carries SES's three DKIM CNAMEs,
+Resend's `resend._domainkey` TXT and its `rsend`/`send` CNAMEs, an SPF record of
+`v=spf1 include:amazonses.com -all`, and DMARC at `p=none` with reports going to
+`readbibletrack@gmail.com`.
+
+That `-all` deliberately does not name Resend, and it does not need to: Resend's
+two CNAMEs make `send.readbibletrack.com` the envelope domain, so SPF is checked
+against that subdomain rather than the apex, and DMARC still aligns because
+Resend's DKIM signs as `readbibletrack.com`. Widening the apex SPF would loosen
+it for no gain.
+
+The DMARC policy starts at `none` on purpose: tighten to `quarantine` once the
+reports show nothing legitimate failing, because going straight to `reject`
+silently kills your own mail if anything is misconfigured.
 
 Nothing *receives* mail at that domain — `noreply@` is a sending identity only,
 and a reply to a sign-in code goes nowhere. The address published in the

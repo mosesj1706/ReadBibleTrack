@@ -57,3 +57,6 @@ shots/
 
 # Xcode archives and exported builds, made by scripts/upload-testflight.sh.
 build/
+
+# The SES credentials, kept while migrating to Resend.
+.smtp.local.ses-backup
