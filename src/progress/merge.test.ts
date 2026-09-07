@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { additionsFrom, type Dated } from './merge.ts';
+import { additionsFrom, withoutRemoved, type Dated } from './merge.ts';
 
 const on = (start: number, end: number, readOn = '2026-01-01'): Dated => ({ start, end, readOn });
 
@@ -73,4 +73,58 @@ test('an unrelated range is taken in full', () => {
     additions.map((a) => [a.start, a.end]),
     [[43_003_016, 43_003_016]],
   );
+});
+
+test('a removal keeps the sync from putting back what was un-marked', () => {
+  // The bug this exists for: unmark Genesis 3, then sync. The pull unions the
+  // server's copy back in and the push writes it out again, so the chapter
+  // reappears on the device that just removed it.
+  const additions = additionsFrom([], [on(1_003_001, 1_003_024)]);
+  const kept = withoutRemoved(additions, [{ start: 1_003_001, end: 1_003_024 }]);
+  assert.deepEqual(kept, []);
+});
+
+test('only the removed part is held back', () => {
+  // The bounds are id arithmetic, not verse counts: ids run
+  // book * 1e6 + chapter * 1e3 + verse, so a span across chapters also covers
+  // the unused ids between them. Subtracting Genesis 2 from Genesis 1-3 leaves
+  // everything below 1_002_001 and everything above 1_002_025, gaps included.
+  // `countVerses` is what turns those bounds back into a number of real
+  // verses, which is why carrying the gaps costs nothing.
+  const additions = additionsFrom([], [on(1_001_001, 1_003_024)]);
+  const kept = withoutRemoved(additions, [{ start: 1_002_001, end: 1_002_025 }]);
+  assert.deepEqual(
+    kept.map((k) => [k.start, k.end]),
+    [
+      [1_001_001, 1_002_000],
+      [1_002_026, 1_003_024],
+    ],
+    'Genesis 1 and 3 survive; only Genesis 2 is held back',
+  );
+});
+
+test('a piece held back keeps the date of the row it came from', () => {
+  const additions = additionsFrom([], [on(1_001_001, 1_002_025, '2025-12-25')]);
+  const kept = withoutRemoved(additions, [{ start: 1_002_001, end: 1_002_025 }]);
+  assert.equal(kept[0].readOn, '2025-12-25');
+});
+
+test('no removals is the union unchanged', () => {
+  const additions = additionsFrom([], [on(1_001_001, 1_001_031)]);
+  assert.deepEqual(withoutRemoved(additions, []), additions);
+});
+
+test('a removal that touches nothing takes nothing', () => {
+  const additions = additionsFrom([], [on(43_003_016, 43_003_016)]);
+  const kept = withoutRemoved(additions, [{ start: 1_001_001, end: 1_001_031 }]);
+  assert.deepEqual(kept, additions);
+});
+
+test('overlapping removals do not double-subtract', () => {
+  const additions = additionsFrom([], [on(1_001_001, 1_001_031)]);
+  const kept = withoutRemoved(additions, [
+    { start: 1_001_001, end: 1_001_020 },
+    { start: 1_001_010, end: 1_001_031 },
+  ]);
+  assert.deepEqual(kept, [], 'the two together cover the whole chapter');
 });

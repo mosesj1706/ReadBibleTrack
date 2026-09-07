@@ -14,7 +14,7 @@
 
 import { openDatabaseAsync, type SQLiteDatabase } from 'expo-sqlite';
 
-import { additionsFrom } from './merge.ts';
+import { additionsFrom, withoutRemoved } from './merge.ts';
 
 import {
   normaliseRanges,
@@ -44,6 +44,21 @@ export function progressDatabase(): Promise<SQLiteDatabase> {
         read_on text not null
       );
       create index if not exists reading_log_span on reading_log (start_id, end_id);
+
+      -- What has been deliberately un-marked.
+      --
+      -- Merging reading is a union, and a union cannot express taking
+      -- something back: nothing distinguishes "never read" from "read, then
+      -- un-read", because both are an absence. Without this table the pull put
+      -- an un-marked chapter straight back and the push then wrote it out
+      -- again, so the device that removed it undid its own removal.
+      create table if not exists reading_removals (
+        id integer primary key autoincrement,
+        start_id integer not null,
+        end_id integer not null,
+        removed_at text not null
+      );
+      create index if not exists reading_removals_span on reading_removals (start_id, end_id);
 
       -- Where reading stopped. One row, always: a person has one place they
       -- are up to, not one per book.
@@ -84,12 +99,76 @@ export async function readRanges(): Promise<VerseRange[]> {
 
 export async function markRead(range: VerseRange, readOn = today()): Promise<void> {
   const db = await progressDatabase();
-  await db.runAsync(
-    'insert into reading_log (start_id, end_id, read_on) values (?, ?, ?)',
-    range.start,
-    range.end,
-    readOn,
+  await db.withTransactionAsync(async () => {
+    await db.runAsync(
+      'insert into reading_log (start_id, end_id, read_on) values (?, ?, ?)',
+      range.start,
+      range.end,
+      readOn,
+    );
+    // Reading it again beats having un-read it, and stops a removal haunting
+    // the range for ever.
+    await forgetRemovals(range);
+  });
+}
+
+/**
+ * Every range that has been taken back and not since re-read.
+ */
+export async function removedRanges(): Promise<VerseRange[]> {
+  const db = await progressDatabase();
+  const rows = await db.getAllAsync<{ start_id: number; end_id: number }>(
+    'select start_id, end_id from reading_removals order by start_id',
   );
+  return rows.map((row) => ({ start: row.start_id, end: row.end_id }));
+}
+
+/**
+ * Drop the removals covering a range, and trim the ones that only overlap it.
+ *
+ * Called when a passage is marked read again. Trimming rather than deleting
+ * matters: un-marking a whole book and then re-reading one chapter of it must
+ * leave the rest of the book removed.
+ */
+export async function forgetRemovals(range: VerseRange): Promise<void> {
+  const db = await progressDatabase();
+  const existing = await db.getAllAsync<{ id: number; start_id: number; end_id: number }>(
+    'select id, start_id, end_id from reading_removals where start_id <= ? and end_id >= ?',
+    range.end,
+    range.start,
+  );
+
+  for (const row of existing) {
+    await db.runAsync('delete from reading_removals where id = ?', row.id);
+    for (const piece of subtractRanges([{ start: row.start_id, end: row.end_id }], [range])) {
+      await db.runAsync(
+        'insert into reading_removals (start_id, end_id, removed_at) values (?, ?, ?)',
+        piece.start,
+        piece.end,
+        new Date().toISOString(),
+      );
+    }
+  }
+}
+
+/** Record removals arriving from another device. */
+export async function mergeRemovals(incoming: readonly VerseRange[]): Promise<number> {
+  if (incoming.length === 0) return 0;
+  const db = await progressDatabase();
+  const now = new Date().toISOString();
+  const additions = subtractRanges(incoming as VerseRange[], await removedRanges());
+
+  await db.withTransactionAsync(async () => {
+    for (const addition of additions) {
+      await db.runAsync(
+        'insert into reading_removals (start_id, end_id, removed_at) values (?, ?, ?)',
+        addition.start,
+        addition.end,
+        now,
+      );
+    }
+  });
+  return additions.length;
 }
 
 /**
@@ -121,6 +200,14 @@ export async function markUnread(range: VerseRange): Promise<void> {
         survivor.readOn,
       );
     }
+    // Written down rather than left as an absence, or the next pull unions it
+    // back in and the push that follows writes it out again.
+    await db.runAsync(
+      'insert into reading_removals (start_id, end_id, removed_at) values (?, ?, ?)',
+      range.start,
+      range.end,
+      new Date().toISOString(),
+    );
   });
 }
 
@@ -141,7 +228,13 @@ export async function markUnread(range: VerseRange): Promise<void> {
 export async function mergeIn(incoming: readonly LoggedRange[]): Promise<number> {
   const db = await progressDatabase();
   // The arithmetic lives in `merge.ts`, where it is tested without a database.
-  const additions = additionsFrom(await loggedRanges(), incoming);
+  // The union first, then whatever has been taken back is held out of it —
+  // otherwise a pull puts an un-marked passage straight back, and the push
+  // that follows writes it to the server as though it had never been removed.
+  const additions = withoutRemoved(
+    additionsFrom(await loggedRanges(), incoming),
+    await removedRanges(),
+  );
 
   if (additions.length > 0) {
     await db.withTransactionAsync(async () => {
@@ -170,6 +263,7 @@ export async function mergeIn(incoming: readonly LoggedRange[]): Promise<number>
 export async function forgetEverything(): Promise<void> {
   const db = await progressDatabase();
   await db.runAsync('delete from reading_log');
+  await db.runAsync('delete from reading_removals');
   await db.runAsync('delete from bookmark');
 }
 

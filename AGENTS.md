@@ -171,10 +171,24 @@ Merging is a union, and only ever adds. The arithmetic is in
 without a database — that file imports relatively with a `.ts` extension for
 the same reason `src/bible/` does.
 
-What a union cannot do is unmarking. Take a chapter back on one device and
-the next merge brings it back from the other, because nothing distinguishes
-"never read" from "read, then undone". Fixing that means recording removals,
-not just additions.
+A union cannot express unmarking, so removals are recorded rather than
+inferred: `reading_removals`, locally and on the server. Unmarking writes one;
+marking the same range again trims the removals covering it, so re-reading
+beats having un-read and a removal cannot haunt a range for ever. `mergeIn`
+unions first and then holds back whatever the removals cover.
+
+It was worse than "the other device brings it back". `syncNow` pulls before it
+pushes, so the pull unioned the server's copy back in and the push wrote it out
+again — the device that removed a chapter undid its own removal, with no second
+device involved.
+
+Removals are private, unlike `reading_log` which a circle sees. Reading is
+something you did; changing your mind about a chapter is not, and showing it
+would make un-marking feel like an admission.
+
+Conflicts are last-writer-wins: unmark on one device while someone marks the
+same chapter on another, and whoever syncs last decides. That is proportionate
+here — the alternative is a CRDT this app does not need.
 
 Marks merge on the range they cover, not on their id: a mark's id is local to
 the device that made it and the server assigns its own, so there is nothing

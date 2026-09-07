@@ -17,7 +17,14 @@
  * so a bug in this file cannot leak someone else's reading.
  */
 
-import { loggedRanges, mergeIn, moveBookmark, readBookmarkMoved } from '@/progress/store';
+import {
+  loggedRanges,
+  mergeIn,
+  mergeRemovals,
+  moveBookmark,
+  readBookmarkMoved,
+  removedRanges,
+} from '@/progress/store';
 import { listMarks, listNotes, mergeMarks, mergeNotes } from '@/marks/store';
 import { supabase } from '@/supabase/client';
 
@@ -41,7 +48,7 @@ export async function pushMine(): Promise<SyncResult> {
 
   // Delete then insert. RLS scopes both to this person, so `eq` is belt and
   // braces rather than the actual guard.
-  for (const table of ['reading_log', 'marks', 'notes']) {
+  for (const table of ['reading_log', 'reading_removals', 'marks', 'notes']) {
     const { error } = await supabase.from(table).delete().eq('user_id', userId);
     if (error) throw new Error(`Could not clear ${table}: ${error.message}`);
   }
@@ -56,6 +63,16 @@ export async function pushMine(): Promise<SyncResult> {
       })),
     );
     if (error) throw new Error(`Could not send reading: ${error.message}`);
+  }
+
+  // Removals are replaced along with the reading they qualify. A device that
+  // sent its log without them would be sending a claim it knows to be stale.
+  const removals = await removedRanges();
+  if (removals.length > 0) {
+    const { error } = await supabase.from('reading_removals').insert(
+      removals.map((range) => ({ user_id: userId, start_id: range.start, end_id: range.end })),
+    );
+    if (error) throw new Error(`Could not send removals: ${error.message}`);
   }
 
   if (marks.length > 0) {
@@ -126,15 +143,26 @@ export async function pullMine(): Promise<{
 }> {
   const userId = await currentUser();
 
-  const [reading, marks, notes, place] = await Promise.all([
+  const [reading, removals, marks, notes, place] = await Promise.all([
     supabase.from('reading_log').select('start_id, end_id, read_on').eq('user_id', userId),
+    supabase.from('reading_removals').select('start_id, end_id').eq('user_id', userId),
     supabase.from('marks').select('start_id, end_id, colour, starred, shared').eq('user_id', userId),
     supabase.from('notes').select('start_id, end_id, body, shared').eq('user_id', userId),
     supabase.from('reading_place').select('verse_id, moved_at').eq('user_id', userId).maybeSingle(),
   ]);
-  for (const result of [reading, marks, notes, place]) {
+  for (const result of [reading, removals, marks, notes, place]) {
     if (result.error) throw new Error(`Could not read your own copy: ${result.error.message}`);
   }
+
+  // Removals first: `mergeIn` holds back whatever they cover, so the union
+  // never puts an un-marked passage back and the push that follows cannot
+  // write it out again.
+  await mergeRemovals(
+    (removals.data ?? []).map((row) => ({
+      start: row.start_id as number,
+      end: row.end_id as number,
+    })),
+  );
 
   const addedReading = await mergeIn(
     (reading.data ?? []).map((row) => ({

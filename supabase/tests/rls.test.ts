@@ -520,6 +520,55 @@ describe('the queries the circle screen actually makes', () => {
   });
 });
 
+describe('taking reading back', () => {
+  test('a removal is yours alone — the circle sees reading, not second thoughts', async () => {
+    const made = await anna.db
+      .from('reading_removals')
+      .insert({ user_id: anna.id, start_id: 1_003_001, end_id: 1_003_024 });
+    assert.equal(made.error, null, made.error?.message ?? 'expected no error');
+
+    const { data: mine } = await anna.db.from('reading_removals').select('start_id');
+    assert.equal(mine?.length, 1, 'Anna can see her own');
+
+    // Deliberately unlike reading_log, which a circle does see. Changing your
+    // mind about a chapter is not the same as reading it, and showing it would
+    // make un-marking feel like an admission.
+    const { data: mate } = await sam.db
+      .from('reading_removals')
+      .select('start_id')
+      .eq('user_id', anna.id);
+    assert.deepEqual(mate, [], 'Sam reads with Anna and still cannot see it');
+  });
+
+  test('nobody can record a removal in someone else’s name', async () => {
+    const { error } = await sam.db
+      .from('reading_removals')
+      .insert({ user_id: anna.id, start_id: 1_001_001, end_id: 1_001_031 });
+    assert.ok(error, 'the insert policy refuses a forged user_id');
+    assert.match(error.message, /row-level security/i);
+  });
+
+  test('nobody can delete someone else’s removal, which would restore reading', async () => {
+    await sam.db.from('reading_removals').delete().eq('user_id', anna.id);
+    const { data } = await anna.db.from('reading_removals').select('id');
+    assert.equal(data?.length, 1, 'Anna’s removal survived Sam trying to drop it');
+  });
+
+  test('a backwards or out-of-canon removal is refused by the database', async () => {
+    const backwards = await anna.db
+      .from('reading_removals')
+      .insert({ user_id: anna.id, start_id: 1_003_010, end_id: 1_003_001 });
+    assert.ok(backwards.error);
+    assert.match(backwards.error.message, /reading_removals_ordered/);
+
+    const outside = await anna.db
+      .from('reading_removals')
+      .insert({ user_id: anna.id, start_id: 99_999_999, end_id: 99_999_999 });
+    assert.ok(outside.error);
+    assert.match(outside.error.message, /reading_removals_in_canon/);
+  });
+});
+
 describe('deleting your own account', () => {
   test('a circle you started stays with the people still in it', async () => {
     // Anna starts a circle, Sam joins, Anna leaves for good. The circle is the
