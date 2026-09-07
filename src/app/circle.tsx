@@ -432,7 +432,15 @@ const styles = StyleSheet.create({
   },
   dot: { width: 10, height: 10, borderRadius: 5 },
   grow: { flexGrow: 1, flexShrink: 1, gap: Spacing.half },
-  code: { fontSize: 34, letterSpacing: 6, fontWeight: '600' },
+  code: {
+    fontSize: 34,
+    // ThemedText's default type is 16/24, and overriding only the size leaves
+    // a 34px glyph in a 24px line box — the tops and tails of the letters were
+    // sliced off. A code you cannot read is the one thing this card is for.
+    lineHeight: 44,
+    letterSpacing: 6,
+    fontWeight: '600',
+  },
   input: {
     borderWidth: StyleSheet.hairlineWidth,
     borderRadius: Spacing.two,

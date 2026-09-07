@@ -11,6 +11,13 @@ before writing Expo code — the API has moved a lot.
   component; both themes have to stay in step.
 - Inside `src/bible/`, imports use explicit `.ts` extensions so the modules run
   under `node --test` with no bundler. App code uses the `@/` alias.
+- Overriding `fontSize` on a `ThemedText` means overriding `lineHeight` too. The
+  `default` type is 16/24, so a larger size inherits a line box too short for it
+  — and iOS clips the glyphs to that box while Android just packs the lines, so
+  the damage is invisible on the platform that is easiest to test. The invite
+  code shipped at 34px in a 24px box and lost the tops of its letters. Plain
+  `TextInput`s inherit nothing and want no `lineHeight`; forcing one on Android
+  clips them instead.
 
 ## Tests
 
