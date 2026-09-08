@@ -569,6 +569,155 @@ describe('taking reading back', () => {
   });
 });
 
+describe('reporting and blocking', () => {
+  test('a block hides what each shares from the other', async () => {
+    const written = await sam.db.from('notes').insert({
+      user_id: sam.id,
+      start_id: 19_023_001,
+      end_id: 19_023_006,
+      body: 'We read this one at the hospital.',
+      shared: true,
+    });
+    assert.equal(written.error, null, written.error?.message ?? 'expected no error');
+
+    const before = await anna.db.from('notes').select('body').eq('user_id', sam.id);
+    assert.equal(before.data?.length, 1, 'shared with the circle, so Anna sees it');
+
+    const blocked = await anna.db
+      .from('member_blocks')
+      .insert({ blocker_id: anna.id, blocked_id: sam.id });
+    assert.equal(blocked.error, null, blocked.error?.message ?? 'expected no error');
+
+    const hers = await anna.db.from('notes').select('body').eq('user_id', sam.id);
+    assert.deepEqual(hers.data, [], 'the person who blocked stops seeing it');
+
+    const his = await sam.db.from('notes').select('body').eq('user_id', anna.id);
+    assert.deepEqual(his.data, [], 'and so does the person blocked — a block is not one-way');
+  });
+
+  test('but reading is not hidden by a block', async () => {
+    await sam.db.from('reading_log').insert({
+      user_id: sam.id,
+      start_id: 1_001_001,
+      end_id: 1_001_005,
+    });
+    const { data } = await anna.db.from('reading_log').select('id').eq('user_id', sam.id);
+    assert.ok((data?.length ?? 0) > 0, 'a block is about what someone writes, not how far they read');
+  });
+
+  test('you cannot see who has blocked you', async () => {
+    const { data } = await sam.db.from('member_blocks').select('blocker_id');
+    assert.deepEqual(data, [], 'telling him would only tell him to make another account');
+  });
+
+  test('unblocking brings it back', async () => {
+    await anna.db
+      .from('member_blocks')
+      .delete()
+      .eq('blocker_id', anna.id)
+      .eq('blocked_id', sam.id);
+    const { data } = await anna.db.from('notes').select('body').eq('user_id', sam.id);
+    assert.equal(data?.length, 1, 'the note was never gone, only withheld');
+  });
+
+  test('a report keeps the words after the note is deleted', async () => {
+    const { data: note } = await sam.db
+      .from('notes')
+      .insert({
+        user_id: sam.id,
+        start_id: 20_015_001,
+        end_id: 20_015_001,
+        body: 'Something unkind about someone in the circle.',
+        shared: true,
+      })
+      .select('id, body')
+      .single();
+    assert.ok(note, 'the note was written');
+
+    const filed = await anna.db.from('content_reports').insert({
+      reporter_id: anna.id,
+      author_id: sam.id,
+      kind: 'note',
+      start_id: 20_015_001,
+      end_id: 20_015_001,
+      body: note.body,
+      reason: 'Unkind about another member.',
+    });
+    assert.equal(filed.error, null, filed.error?.message ?? 'expected no error');
+
+    // The first thing an author does when challenged.
+    await sam.db.from('notes').delete().eq('id', note.id);
+
+    const { data } = await anna.db
+      .from('content_reports')
+      .select('body')
+      .eq('author_id', sam.id);
+    assert.equal(data?.length, 1);
+    assert.match(data![0].body as string, /unkind/i, 'the copy outlived the original');
+  });
+
+  test('the person reported cannot see the report, and it cannot be unfiled', async () => {
+    const seen = await sam.db.from('content_reports').select('id').eq('author_id', sam.id);
+    assert.deepEqual(seen.data, [], 'reports are not visible to the person they are about');
+
+    // No delete or update policy exists, so RLS narrows the statement to no
+    // rows rather than refusing it: the call comes back clean and changes
+    // nothing. Asserting on the error would be asserting on the wrong thing —
+    // what matters is that the report is still there afterwards.
+    await anna.db.from('content_reports').delete().eq('reporter_id', anna.id);
+    await anna.db.from('content_reports').update({ reason: 'Never mind' }).eq('reporter_id', anna.id);
+
+    const { data } = await anna.db
+      .from('content_reports')
+      .select('reason')
+      .eq('author_id', sam.id);
+    assert.equal(data?.length, 1, 'a report is evidence: it cannot be unfiled');
+    assert.match(data![0].reason as string, /unkind/i, 'nor rewritten');
+  });
+
+  test('you cannot report yourself', async () => {
+    const { error } = await anna.db.from('content_reports').insert({
+      reporter_id: anna.id,
+      author_id: anna.id,
+      kind: 'note',
+      start_id: 1_001_001,
+      end_id: 1_001_001,
+    });
+    assert.ok(error, 'the check constraint holds');
+  });
+
+  test('the owner can remove someone; a member cannot', async () => {
+    const joined = await ruth.db.rpc('join_circle', { code: joinCode });
+    assert.equal(joined.error, null, joined.error?.message ?? 'expected no error');
+
+    await sam.db
+      .from('circle_members')
+      .delete()
+      .eq('circle_id', circleId)
+      .eq('user_id', ruth.id);
+    const survived = await anna.db
+      .from('circle_members')
+      .select('user_id')
+      .eq('circle_id', circleId)
+      .eq('user_id', ruth.id);
+    assert.equal(survived.data?.length, 1, 'Sam is a member, not the owner');
+
+    const removed = await anna.db
+      .from('circle_members')
+      .delete()
+      .eq('circle_id', circleId)
+      .eq('user_id', ruth.id);
+    assert.equal(removed.error, null, removed.error?.message ?? 'expected no error');
+
+    const gone = await anna.db
+      .from('circle_members')
+      .select('user_id')
+      .eq('circle_id', circleId)
+      .eq('user_id', ruth.id);
+    assert.deepEqual(gone.data, [], 'whoever started the circle can put someone out of it');
+  });
+});
+
 describe('deleting your own account', () => {
   test('a circle you started stays with the people still in it', async () => {
     // Anna starts a circle, Sam joins, Anna leaves for good. The circle is the

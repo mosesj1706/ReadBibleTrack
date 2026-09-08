@@ -115,6 +115,25 @@ export default function SupportScreen() {
               </P>
             </Section>
 
+            <Section title="If someone shares something wrong">
+              <P>
+                Open the ✎ panel while reading the chapter it is in. Every shared highlight and
+                note has a small ⚑ beside it, and that offers two things: report it, or block the
+                person who wrote it.
+              </P>
+              <P>
+                Blocking hides everything that person shares, in both directions, straight away. It
+                leaves their reading alone, because a circle&rsquo;s progress is the thing you came
+                for and one unpleasant note should not cost you it. If you started the circle, you
+                can also remove someone from it entirely, from the Circle tab.
+              </P>
+              <P>
+                A report comes to {CONTACT} with a copy of what was written, and is read by a
+                person. Anything that has no business in a circle is removed and the account behind
+                it is dealt with.
+              </P>
+            </Section>
+
             <Section title="Deleting your account">
               <P>
                 In the app: the You tab, at the foot, &ldquo;Delete my account&rdquo;. It removes

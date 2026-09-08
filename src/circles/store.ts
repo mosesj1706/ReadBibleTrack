@@ -132,3 +132,92 @@ export async function leaveCircle(circleId: string): Promise<void> {
     .eq('user_id', id);
   if (error) throw new Error(error.message);
 }
+
+/**
+ * Reporting something a circle-mate shared.
+ *
+ * The note's text is copied into the report rather than pointed at. Deleting
+ * the note is the first thing an author does when challenged, and a report
+ * that empties itself at that moment would be no use to anyone judging it.
+ *
+ * There is no moderation queue in the app: reports are read out of the
+ * database by the person who runs it, and the address for chasing one is on
+ * the support page. That is proportionate for circles of two to a handful of
+ * people who joined with a code the owner gave them by hand.
+ */
+export type ReportedContent = {
+  readonly kind: 'note' | 'mark';
+  readonly authorId: string;
+  readonly start: number;
+  readonly end: number;
+  readonly body?: string;
+  readonly reason?: string;
+};
+
+async function meOrThrow(): Promise<string> {
+  const { data } = await supabase.auth.getUser();
+  const id = data.user?.id;
+  if (!id) throw new Error('Not signed in.');
+  return id;
+}
+
+export async function reportContent(item: ReportedContent): Promise<void> {
+  const me = await meOrThrow();
+  const { error } = await supabase.from('content_reports').insert({
+    reporter_id: me,
+    author_id: item.authorId,
+    kind: item.kind,
+    start_id: item.start,
+    end_id: item.end,
+    body: item.body ?? null,
+    reason: item.reason ?? null,
+  });
+  if (error) throw new Error(`Could not send the report: ${error.message}`);
+}
+
+/**
+ * Blocking hides shared marks and notes both ways round, and nothing else.
+ *
+ * Reading stays visible: it is the circle's shared purpose, and a block is not
+ * meant to make you disappear from a family's progress because one person was
+ * unpleasant. Putting someone out of the circle altogether is the owner's
+ * remedy — `removeMember` — and is deliberately a different, heavier act.
+ */
+export async function blockPerson(userId: string): Promise<void> {
+  const me = await meOrThrow();
+  const { error } = await supabase
+    .from('member_blocks')
+    .insert({ blocker_id: me, blocked_id: userId });
+  if (error) throw new Error(error.message);
+}
+
+export async function unblockPerson(userId: string): Promise<void> {
+  const me = await meOrThrow();
+  const { error } = await supabase
+    .from('member_blocks')
+    .delete()
+    .eq('blocker_id', me)
+    .eq('blocked_id', userId);
+  if (error) throw new Error(error.message);
+}
+
+/** Who you have blocked. RLS means this can only ever be your own list. */
+export async function blockedPeople(): Promise<string[]> {
+  const { data, error } = await supabase.from('member_blocks').select('blocked_id');
+  if (error) throw new Error(error.message);
+  return (data ?? []).map((row) => row.blocked_id as string);
+}
+
+/**
+ * Put someone out of a circle. Only whoever started it may, and never
+ * themselves — leaving is `leaveCircle`, and conflating the two would let an
+ * owner delete their own membership while the circle kept pointing at them.
+ */
+export async function removeMember(circleId: string, userId: string): Promise<void> {
+  const { error } = await supabase
+    .from('circle_members')
+    .delete()
+    .eq('circle_id', circleId)
+    .eq('user_id', userId);
+  if (error) throw new Error(error.message);
+}

@@ -22,7 +22,15 @@ import {
 } from 'react';
 
 import type { VerseRange } from '@/bible/verse-id.ts';
-import { membersOf, myCircles } from './store';
+import {
+  blockPerson,
+  blockedPeople,
+  membersOf,
+  myCircles,
+  reportContent,
+  unblockPerson,
+  type ReportedContent,
+} from './store';
 import { pullCircleMarks, pullCircleNotes, type CircleMark, type CircleNote } from '@/sync/sync';
 
 type CircleValue = {
@@ -33,6 +41,11 @@ type CircleValue = {
   readonly nameOf: (userId: string) => string | undefined;
   readonly refresh: () => void;
   readonly inACircle: boolean;
+  /** People whose shared marks and notes you have chosen not to see. */
+  readonly isBlocked: (userId: string) => boolean;
+  readonly block: (userId: string) => Promise<void>;
+  readonly unblock: (userId: string) => Promise<void>;
+  readonly report: (item: ReportedContent) => Promise<void>;
 };
 
 const CircleContext = createContext<CircleValue | undefined>(undefined);
@@ -45,6 +58,7 @@ export function CircleProvider({ children }: { readonly children: ReactNode }) {
   const [notes, setNotes] = useState<readonly CircleNote[]>([]);
   const [names, setNames] = useState<ReadonlyMap<string, string>>(new Map());
   const [inACircle, setInACircle] = useState(false);
+  const [blocked, setBlocked] = useState<ReadonlySet<string>>(new Set());
 
   const refresh = useCallback(() => {
     void (async () => {
@@ -56,17 +70,23 @@ export function CircleProvider({ children }: { readonly children: ReactNode }) {
           setMarks([]);
           setNotes([]);
           setNames(new Map());
+          setBlocked(new Set());
           return;
         }
         setInACircle(true);
-        const [people, theirMarks, theirNotes] = await Promise.all([
+        // The server already withholds a blocked person's marks and notes —
+        // this list is only so the circle screen can show who is blocked and
+        // offer to undo it.
+        const [people, theirMarks, theirNotes, blocks] = await Promise.all([
           membersOf(first.id),
           pullCircleMarks(),
           pullCircleNotes(),
+          blockedPeople(),
         ]);
         setNames(new Map(people.map((person) => [person.userId, person.displayName])));
         setMarks(theirMarks);
         setNotes(theirNotes);
+        setBlocked(new Set(blocks));
       } catch {
         // Offline, signed out, or the server is unwell. The reader carries on
         // with this person's own marks, which is the important half.
@@ -87,10 +107,34 @@ export function CircleProvider({ children }: { readonly children: ReactNode }) {
     [notes],
   );
   const nameOf = useCallback((userId: string) => names.get(userId), [names]);
+  const isBlocked = useCallback((userId: string) => blocked.has(userId), [blocked]);
+
+  // Each of these refreshes afterwards rather than editing state in place: the
+  // block is what decides whether their notes come back at all, and the server
+  // is the one that decides that.
+  const block = useCallback(
+    async (userId: string) => {
+      await blockPerson(userId);
+      refresh();
+    },
+    [refresh],
+  );
+
+  const unblock = useCallback(
+    async (userId: string) => {
+      await unblockPerson(userId);
+      refresh();
+    },
+    [refresh],
+  );
+
+  const report = useCallback(async (item: ReportedContent) => {
+    await reportContent(item);
+  }, []);
 
   const value = useMemo(
-    () => ({ marksIn, notesIn, nameOf, refresh, inACircle }),
-    [marksIn, notesIn, nameOf, refresh, inACircle],
+    () => ({ marksIn, notesIn, nameOf, refresh, inACircle, isBlocked, block, unblock, report }),
+    [marksIn, notesIn, nameOf, refresh, inACircle, isBlocked, block, unblock, report],
   );
 
   return <CircleContext.Provider value={value}>{children}</CircleContext.Provider>;

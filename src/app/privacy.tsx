@@ -21,7 +21,7 @@ import { ThemedText } from '@/components/themed-text';
 import { Fonts, MaxContentWidth, Spacing } from '@/constants/theme';
 
 /** Changed only when the policy itself changes, not when this file is edited. */
-const UPDATED = '7 September 2026';
+const UPDATED = '8 September 2026';
 
 /**
  * Deliberately not a personal address, and deliberately one that works today.
@@ -119,6 +119,12 @@ export default function PrivacyScreen() {
               </P>
               <P>
                 <ThemedText type="smallBold">Which circles you are in.</ThemedText>
+              </P>
+              <P>
+                <ThemedText type="smallBold">Anything you report, and anyone you block.</ThemedText>{' '}
+                Reporting something keeps a copy of what was written, who wrote it and who reported
+                it, so it can be judged after the original is deleted. A block records only the two
+                people involved, and is never shown to the person blocked.
               </P>
             </Section>
 

@@ -6,6 +6,7 @@
  * where everything lives.
  */
 
+import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { formatReference } from '@/bible/reference.ts';
@@ -17,6 +18,102 @@ import { useTheme } from '@/hooks/use-theme';
 import { useCircle } from '@/circles/provider';
 import { MARK_TINTS, useMarks } from '@/marks/provider';
 import type { MarkColour } from '@/marks/store';
+
+/**
+ * Reporting a shared mark or note, and blocking whoever wrote it.
+ *
+ * Inline rather than a native `Alert`, matching the delete-account confirm on
+ * the You screen. `Alert` does nothing at all in the web build, and a safety
+ * control that silently does nothing on one platform is worse than not having
+ * one: the person reaches for it in the moment they most need it to work.
+ *
+ * Blocking hides what this person shares, both ways round, and leaves their
+ * reading alone. Putting them out of the circle is the owner's remedy, on the
+ * Circle screen — a heavier thing, kept somewhere you have to mean it.
+ */
+function Concern({
+  kind,
+  authorId,
+  start,
+  end,
+  body,
+}: {
+  readonly kind: 'note' | 'mark';
+  readonly authorId: string;
+  readonly start: number;
+  readonly end: number;
+  readonly body?: string;
+}) {
+  const theme = useTheme();
+  const { nameOf, block, report } = useCircle();
+  const [open, setOpen] = useState(false);
+  const [said, setSaid] = useState<string | undefined>(undefined);
+  const who = nameOf(authorId) ?? 'Someone';
+
+  if (said) {
+    return (
+      <ThemedText type="small" themeColor="textFaint">
+        {said}
+      </ThemedText>
+    );
+  }
+
+  if (!open) {
+    return (
+      <Pressable
+        onPress={() => setOpen(true)}
+        accessibilityRole="button"
+        accessibilityLabel={`Report or block ${who}`}
+        style={styles.flag}
+      >
+        <ThemedText type="small" themeColor="textFaint">
+          ⚑
+        </ThemedText>
+      </Pressable>
+    );
+  }
+
+  return (
+    <View style={[styles.concern, { borderColor: theme.border }]}>
+      <ThemedText type="small" themeColor="textSecondary">
+        Something wrong with what {who} shared?
+      </ThemedText>
+      <View style={styles.concernRow}>
+        <Pressable
+          onPress={() => {
+            void report({ kind, authorId, start, end, body })
+              .then(() => setSaid('Reported. It will be looked at.'))
+              .catch(() => setSaid('Could not send that just now.'));
+          }}
+          accessibilityRole="button"
+          style={styles.concernAction}
+        >
+          <ThemedText type="smallBold" themeColor="accent">
+            Report it
+          </ThemedText>
+        </Pressable>
+        <Pressable
+          onPress={() => {
+            void block(authorId)
+              .then(() => setSaid(`You will not see what ${who} shares.`))
+              .catch(() => setSaid('Could not do that just now.'));
+          }}
+          accessibilityRole="button"
+          style={styles.concernAction}
+        >
+          <ThemedText type="smallBold" themeColor="accent">
+            Block {who}
+          </ThemedText>
+        </Pressable>
+        <Pressable onPress={() => setOpen(false)} accessibilityRole="button" style={styles.concernAction}>
+          <ThemedText type="small" themeColor="textFaint">
+            Cancel
+          </ThemedText>
+        </Pressable>
+      </View>
+    </View>
+  );
+}
 
 export function ChapterMarkings({
   range,
@@ -121,25 +218,28 @@ export function ChapterMarkings({
             {theirs.map((mark, index) => (
               <View
                 key={`m${index}`}
-                style={[styles.row, styles.fromThem, { borderColor: theme.border }]}
+                style={[styles.theirBox, styles.fromThem, { borderColor: theme.border }]}
               >
-                {mark.colour ? (
-                  <View
-                    style={[
-                      styles.chip,
-                      { backgroundColor: MARK_TINTS[mark.colour as MarkColour][scheme] },
-                    ]}
-                  />
-                ) : (
-                  <ThemedText themeColor="accent">★</ThemedText>
-                )}
-                <View style={styles.grow}>
-                  <ThemedText type="small" style={{ fontFamily: Fonts.serif }}>
-                    {formatReference(mark)}
-                  </ThemedText>
-                  <ThemedText type="small" themeColor="textFaint">
-                    {nameOf(mark.userId) ?? 'Someone'}
-                  </ThemedText>
+                <View style={styles.theirTop}>
+                  {mark.colour ? (
+                    <View
+                      style={[
+                        styles.chip,
+                        { backgroundColor: MARK_TINTS[mark.colour as MarkColour][scheme] },
+                      ]}
+                    />
+                  ) : (
+                    <ThemedText themeColor="accent">★</ThemedText>
+                  )}
+                  <View style={styles.grow}>
+                    <ThemedText type="small" style={{ fontFamily: Fonts.serif }}>
+                      {formatReference(mark)}
+                    </ThemedText>
+                    <ThemedText type="small" themeColor="textFaint">
+                      {nameOf(mark.userId) ?? 'Someone'}
+                    </ThemedText>
+                  </View>
+                  <Concern kind="mark" authorId={mark.userId} start={mark.start} end={mark.end} />
                 </View>
               </View>
             ))}
@@ -158,6 +258,13 @@ export function ChapterMarkings({
                 <ThemedText type="small" themeColor="textFaint">
                   {nameOf(note.userId) ?? 'Someone'}
                 </ThemedText>
+                <Concern
+                  kind="note"
+                  authorId={note.userId}
+                  start={note.start}
+                  end={note.end}
+                  body={note.body}
+                />
               </View>
             ))}
           </>
@@ -186,6 +293,25 @@ const styles = StyleSheet.create({
     borderRadius: Radius.small,
     borderWidth: StyleSheet.hairlineWidth,
   },
+  theirBox: {
+    borderRadius: Radius.small,
+    borderWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: Spacing.two,
+    paddingVertical: Spacing.one,
+    gap: Spacing.one,
+  },
+  theirTop: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two, minHeight: 44 },
+  // Small on purpose, but still a 44pt target: findable in the moment someone
+  // wants it, and quiet every other moment.
+  flag: { minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
+  concern: {
+    gap: Spacing.one,
+    padding: Spacing.two,
+    borderRadius: Radius.small,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  concernRow: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two, alignItems: 'center' },
+  concernAction: { minHeight: 44, justifyContent: 'center' },
   note: {
     gap: Spacing.half,
     padding: Spacing.two,

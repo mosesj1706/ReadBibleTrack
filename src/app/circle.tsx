@@ -23,9 +23,12 @@ import {
   CIRCLE_KINDS,
   createCircle,
   joinByCode,
+  blockedPeople,
   leaveCircle,
   membersOf,
   myCircles,
+  removeMember,
+  unblockPerson,
   type Circle,
   type CircleKind,
   type Member,
@@ -57,6 +60,10 @@ export default function CircleScreen() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | undefined>();
   const [problem, setProblem] = useState<string | undefined>();
+  const [blocked, setBlocked] = useState<readonly string[]>([]);
+  // Removing someone takes two taps, like deleting an account: it ends their
+  // place in something shared, and cannot be undone from here.
+  const [removing, setRemoving] = useState<string | undefined>();
 
   const [name, setName] = useState('');
   const [kind, setKind] = useState<CircleKind>('family');
@@ -68,12 +75,18 @@ export default function CircleScreen() {
       const first = circles[0];
       setCircle(first);
       if (first) {
-        const [people, read] = await Promise.all([membersOf(first.id), pullCircleReading()]);
+        const [people, read, blocks] = await Promise.all([
+          membersOf(first.id),
+          pullCircleReading(),
+          blockedPeople(),
+        ]);
         setMembers(people);
         setReading(read);
+        setBlocked(blocks);
       } else {
         setMembers([]);
         setReading([]);
+        setBlocked([]);
       }
       // Cleared once the load has actually worked, not on the way in. Blanking
       // it first meant a failing reload flashed the old error away and then
@@ -179,36 +192,108 @@ export default function CircleScreen() {
               {members.map((member) => {
                 const theirs = reading.find((r) => r.userId === member.userId);
                 const readToday = theirs?.lastReadOn === todayIso;
+                const isMe = member.userId === me;
+                const isBlocked = blocked.includes(member.userId);
+                const mine = circle.createdBy === me;
                 return (
                   <View
                     key={member.userId}
                     style={[
-                      styles.member,
+                      styles.memberBox,
                       { backgroundColor: theme.backgroundElement, borderColor: theme.border },
                     ]}
                   >
-                    <View
-                      style={[
-                        styles.dot,
-                        { backgroundColor: readToday ? theme.accent : theme.backgroundSelected },
-                      ]}
-                    />
-                    <View style={styles.grow}>
-                      <ThemedText type="smallBold">
-                        {member.displayName}
-                        {member.userId === me ? ' (you)' : ''}
-                      </ThemedText>
-                      <ThemedText type="small" themeColor="textSecondary">
-                        {readToday
-                          ? 'Read today'
-                          : theirs?.lastReadOn
-                            ? `Last read ${theirs.lastReadOn}`
-                            : 'Not started'}
+                    <View style={styles.memberTop}>
+                      <View
+                        style={[
+                          styles.dot,
+                          { backgroundColor: readToday ? theme.accent : theme.backgroundSelected },
+                        ]}
+                      />
+                      <View style={styles.grow}>
+                        <ThemedText type="smallBold">
+                          {member.displayName}
+                          {isMe ? ' (you)' : ''}
+                        </ThemedText>
+                        <ThemedText type="small" themeColor="textSecondary">
+                          {readToday
+                            ? 'Read today'
+                            : theirs?.lastReadOn
+                              ? `Last read ${theirs.lastReadOn}`
+                              : 'Not started'}
+                        </ThemedText>
+                      </View>
+                      <ThemedText type="small" themeColor="textFaint">
+                        {theirs ? `${countVerses(theirs.ranges as VerseRange[])}` : '0'}
                       </ThemedText>
                     </View>
-                    <ThemedText type="small" themeColor="textFaint">
-                      {theirs ? `${countVerses(theirs.ranges as VerseRange[])}` : '0'}
-                    </ThemedText>
+
+                    {/* Only shown where there is something to do: a block to
+                        undo, or a circle of your own to remove someone from.
+                        Reading stays visible either way — a block is about
+                        what someone writes, not about erasing them from the
+                        thing you are doing together. */}
+                    {!isMe && (isBlocked || mine) ? (
+                      <View style={styles.memberActions}>
+                        {isBlocked ? (
+                          <>
+                            <ThemedText type="small" themeColor="textFaint">
+                              You do not see what they share.
+                            </ThemedText>
+                            <Pressable
+                              onPress={() => run('unblock', () => unblockPerson(member.userId))}
+                              accessibilityRole="button"
+                              disabled={busy !== undefined}
+                              style={styles.quiet}
+                            >
+                              <ThemedText type="smallBold" themeColor="accent">
+                                Unblock
+                              </ThemedText>
+                            </Pressable>
+                          </>
+                        ) : null}
+
+                        {mine && removing === member.userId ? (
+                          <>
+                            <ThemedText type="small" themeColor="textSecondary">
+                              Remove {member.displayName} from this circle?
+                            </ThemedText>
+                            <Pressable
+                              onPress={() => setRemoving(undefined)}
+                              accessibilityRole="button"
+                              style={styles.quiet}
+                            >
+                              <ThemedText type="smallBold" themeColor="accent">
+                                Keep them
+                              </ThemedText>
+                            </Pressable>
+                            <Pressable
+                              onPress={() => {
+                                setRemoving(undefined);
+                                void run('remove', () => removeMember(circle.id, member.userId));
+                              }}
+                              accessibilityRole="button"
+                              disabled={busy !== undefined}
+                              style={styles.quiet}
+                            >
+                              <ThemedText type="smallBold" style={{ color: theme.redLetter }}>
+                                Remove
+                              </ThemedText>
+                            </Pressable>
+                          </>
+                        ) : mine ? (
+                          <Pressable
+                            onPress={() => setRemoving(member.userId)}
+                            accessibilityRole="button"
+                            style={styles.quiet}
+                          >
+                            <ThemedText type="small" themeColor="textFaint">
+                              Remove from circle
+                            </ThemedText>
+                          </Pressable>
+                        ) : null}
+                      </View>
+                    ) : null}
                   </View>
                 );
               })}
@@ -430,6 +515,14 @@ const styles = StyleSheet.create({
     padding: Spacing.three,
     minHeight: 56,
   },
+  memberBox: {
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: Spacing.two,
+    padding: Spacing.three,
+    gap: Spacing.two,
+  },
+  memberTop: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three, minHeight: 56 },
+  memberActions: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: Spacing.two },
   dot: { width: 10, height: 10, borderRadius: 5 },
   grow: { flexGrow: 1, flexShrink: 1, gap: Spacing.half },
   code: {
