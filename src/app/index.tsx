@@ -13,6 +13,7 @@ import { ScriptureText } from '@/components/scripture-text';
 import { ThemedText } from '@/components/themed-text';
 import { Fonts, MaxContentWidth, MaxPageWidth, Radius, Spacing, WideBreakpoint } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { useAuth } from '@/auth/provider';
 import { usePlan } from '@/plans/provider';
 import { useProgress } from '@/progress/provider';
 import { usePassage } from '@/scripture/provider';
@@ -82,6 +83,14 @@ export default function TodayScreen() {
     month: 'long',
   });
 
+  // The first name only. "Good morning, Mary Anne Robinson" is a form letter;
+  // the people this app is for are read with by name.
+  const { profile } = useAuth();
+  const firstName = profile?.displayName.trim().split(/\s+/)[0];
+  const hour = new Date().getHours();
+  const greeting =
+    hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
+
   return (
     <Ground style={styles.screen} scroll={scrolled}>
       <SafeAreaView style={styles.container}>
@@ -94,7 +103,11 @@ export default function TodayScreen() {
               {today}
             </ThemedText>
             <ThemedText type="title" style={[styles.title, { fontFamily: Fonts.serif }]}>
-              {planned ? 'Today’s reading' : 'Keep reading'}
+              {firstName
+                ? `${greeting}, ${firstName}`
+                : planned
+                  ? 'Today’s reading'
+                  : 'Keep reading'}
             </ThemedText>
           </View>
 

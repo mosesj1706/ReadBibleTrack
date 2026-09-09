@@ -35,6 +35,12 @@ type AuthValue = {
   readonly profile: Profile | null;
   /** True until the stored session has been read back at launch. */
   readonly loading: boolean;
+  /**
+   * False in the moment between signing in and this person's profile arriving.
+   * Without it the gate reads "signed in, no profile" and asks a returning
+   * person to name themselves again, for as long as the fetch takes.
+   */
+  readonly profileReady: boolean;
   /** Set when the server could not be reached at launch. */
   readonly offline: boolean;
   readonly sendCode: (email: string) => Promise<void>;
@@ -65,12 +71,16 @@ function readable(error: unknown, fallback: string): Error {
 export function AuthProvider({ children }: { readonly children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
+  // Which person `profile` describes, rather than a loading flag: derived
+  // state cannot drift out of step with the thing it is describing.
+  const [profileFor, setProfileFor] = useState<string | undefined>(undefined);
   const [loading, setLoading] = useState(true);
   const [offline, setOffline] = useState(false);
 
   const loadProfile = useCallback(async (userId: string | undefined) => {
     if (!userId) {
       setProfile(null);
+      setProfileFor(undefined);
       return;
     }
     const { data } = await supabase
@@ -90,6 +100,7 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
           }
         : null,
     );
+    setProfileFor(userId);
   }, []);
 
   useEffect(() => {
@@ -181,6 +192,7 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
   const signOut = useCallback(async () => {
     await supabase.auth.signOut();
     setProfile(null);
+    setProfileFor(undefined);
   }, []);
 
   const deleteAccount = useCallback(async () => {
@@ -201,11 +213,16 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
     setProfile(null);
   }, []);
 
+  // Derived, not stored: the profile is known for this person exactly when the
+  // one we hold was fetched for them.
+  const profileReady = profileFor === session?.user.id;
+
   const value = useMemo(
     () => ({
       session,
       profile,
       loading,
+      profileReady,
       offline,
       sendCode,
       deleteAccount,
@@ -218,6 +235,7 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
       session,
       profile,
       loading,
+      profileReady,
       offline,
       sendCode,
       verifyCode,
