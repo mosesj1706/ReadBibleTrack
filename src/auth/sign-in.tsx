@@ -13,7 +13,16 @@
  */
 
 import { useState } from 'react';
-import { ActivityIndicator, Keyboard, Pressable, StyleSheet, TextInput, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Keyboard,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  StyleSheet,
+  TextInput,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
@@ -40,6 +49,9 @@ export function SignInScreen() {
   const looksLikeEmail = /^\S+@\S+\.\S+$/.test(email.trim());
 
   async function attempt(work: () => Promise<void>, onDone?: () => void) {
+    // Whichever way this was reached — the return key, or the button — the
+    // keyboard has done its job and should get out of the way.
+    Keyboard.dismiss();
     setBusy(true);
     setProblem(undefined);
     try {
@@ -78,118 +90,128 @@ export function SignInScreen() {
         onPress={Keyboard.dismiss}
         accessible={false}
       />
-      <SafeAreaView style={styles.container}>
-        <View style={styles.header}>
-          <ThemedText type="small" themeColor="textFaint" style={styles.eyebrow}>
-            ReadBibleTrack
-          </ThemedText>
-          <ThemedText type="title" style={[styles.title, { fontFamily: Fonts.serif }]}>
-            {stage === 'email' ? 'Read together' : 'Check your email'}
-          </ThemedText>
-          <ThemedText themeColor="textSecondary" style={styles.blurb}>
-            {stage === 'email'
-              ? 'Your email address is all we need. We’ll send a short code — there’s no password to remember.'
-              : `We sent a code to ${email.trim()}. It’s good for an hour.`}
-          </ThemedText>
-        </View>
-
-        {stage === 'email' ? (
-          <View style={styles.form}>
-            <TextInput
-              style={[styles.input, field]}
-              value={email}
-              onChangeText={setEmail}
-              placeholder="you@example.com"
-              placeholderTextColor={theme.textFaint}
-              autoCapitalize="none"
-              autoCorrect={false}
-              autoComplete="email"
-              inputMode="email"
-              keyboardType="email-address"
-              editable={!busy}
-              onSubmitEditing={() => {
-                Keyboard.dismiss();
-                if (looksLikeEmail) attempt(() => sendCode(email), () => setStage('code'));
-              }}
-              returnKeyType="send"
-            />
-            <Action
-              label="Send my code"
-              busy={busy}
-              disabled={!looksLikeEmail}
-              onPress={() => attempt(() => sendCode(email), () => setStage('code'))}
-            />
-            <Pressable
-              onPress={() => {
-                setProblem(undefined);
-                setStage('code');
-              }}
-              disabled={!looksLikeEmail}
-              accessibilityRole="button"
-              style={styles.already}
-            >
-              <ThemedText type="small" themeColor={looksLikeEmail ? 'accent' : 'textFaint'}>
-                I already have a code
-              </ThemedText>
-            </Pressable>
-          </View>
-        ) : (
-          <View style={styles.form}>
-            <TextInput
-              style={[styles.input, styles.codeInput, field]}
-              value={code}
-              onChangeText={(next) => setCode(next.replace(/\D/g, '').slice(0, CODE_MAX))}
-              placeholder="––––––"
-              placeholderTextColor={theme.textFaint}
-              inputMode="numeric"
-              keyboardType="number-pad"
-              autoComplete="one-time-code"
-              textContentType="oneTimeCode"
-              editable={!busy}
-              returnKeyType="go"
-              onSubmitEditing={() => {
-                Keyboard.dismiss();
-                if (code.length >= CODE_MIN) attempt(() => verifyCode(email, code));
-              }}
-            />
-            <Action
-              label="Sign in"
-              busy={busy}
-              disabled={code.length < CODE_MIN}
-              onPress={() => attempt(() => verifyCode(email, code))}
-            />
-            <Pressable
-              onPress={() => {
-                setStage('email');
-                setCode('');
-                setProblem(undefined);
-              }}
-              accessibilityRole="button"
-            >
-              <ThemedText type="small" themeColor="accent" style={styles.back}>
-                Use a different email
-              </ThemedText>
-            </Pressable>
-          </View>
-        )}
-
-        {offline && !problem ? (
-          <View style={[styles.problem, { borderLeftColor: theme.textFaint }]}>
-            <ThemedText type="small" themeColor="textSecondary">
-              Can’t reach the server just now. Signing in needs a connection —
-              reading does not, once you are in.
+      {/* The content is centred, so without this the keyboard covers exactly
+          the things you need next: "Send my code", "I already have a code",
+          and "Sign in". Worse on the code step — an iOS number pad has no
+          return key, so there is no way to dismiss it from the keyboard at
+          all, and the button underneath it was the only way forward. */}
+      <KeyboardAvoidingView
+        style={styles.avoider}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
+        <SafeAreaView style={styles.container}>
+          <View style={styles.header}>
+            <ThemedText type="small" themeColor="textFaint" style={styles.eyebrow}>
+              ReadBibleTrack
+            </ThemedText>
+            <ThemedText type="title" style={[styles.title, { fontFamily: Fonts.serif }]}>
+              {stage === 'email' ? 'Read together' : 'Check your email'}
+            </ThemedText>
+            <ThemedText themeColor="textSecondary" style={styles.blurb}>
+              {stage === 'email'
+                ? 'Your email address is all we need. We’ll send a short code — there’s no password to remember.'
+                : `We sent a code to ${email.trim()}. It’s good for an hour.`}
             </ThemedText>
           </View>
-        ) : null}
 
-        {problem ? (
-          <View style={[styles.problem, { borderLeftColor: theme.redLetter }]}>
-            <ThemedText type="small" style={{ color: theme.redLetter }}>
-              {problem}
-            </ThemedText>
-          </View>
-        ) : null}
-      </SafeAreaView>
+          {stage === 'email' ? (
+            <View style={styles.form}>
+              <TextInput
+                style={[styles.input, field]}
+                value={email}
+                onChangeText={setEmail}
+                placeholder="you@example.com"
+                placeholderTextColor={theme.textFaint}
+                autoCapitalize="none"
+                autoCorrect={false}
+                autoComplete="email"
+                inputMode="email"
+                keyboardType="email-address"
+                editable={!busy}
+                onSubmitEditing={() => {
+                  Keyboard.dismiss();
+                  if (looksLikeEmail) attempt(() => sendCode(email), () => setStage('code'));
+                }}
+                returnKeyType="send"
+              />
+              <Action
+                label="Send my code"
+                busy={busy}
+                disabled={!looksLikeEmail}
+                onPress={() => attempt(() => sendCode(email), () => setStage('code'))}
+              />
+              <Pressable
+                onPress={() => {
+                  setProblem(undefined);
+                  setStage('code');
+                }}
+                disabled={!looksLikeEmail}
+                accessibilityRole="button"
+                style={styles.already}
+              >
+                <ThemedText type="small" themeColor={looksLikeEmail ? 'accent' : 'textFaint'}>
+                  I already have a code
+                </ThemedText>
+              </Pressable>
+            </View>
+          ) : (
+            <View style={styles.form}>
+              <TextInput
+                style={[styles.input, styles.codeInput, field]}
+                value={code}
+                onChangeText={(next) => setCode(next.replace(/\D/g, '').slice(0, CODE_MAX))}
+                placeholder="––––––"
+                placeholderTextColor={theme.textFaint}
+                inputMode="numeric"
+                keyboardType="number-pad"
+                autoComplete="one-time-code"
+                textContentType="oneTimeCode"
+                editable={!busy}
+                returnKeyType="go"
+                onSubmitEditing={() => {
+                  Keyboard.dismiss();
+                  if (code.length >= CODE_MIN) attempt(() => verifyCode(email, code));
+                }}
+              />
+              <Action
+                label="Sign in"
+                busy={busy}
+                disabled={code.length < CODE_MIN}
+                onPress={() => attempt(() => verifyCode(email, code))}
+              />
+              <Pressable
+                onPress={() => {
+                  setStage('email');
+                  setCode('');
+                  setProblem(undefined);
+                }}
+                accessibilityRole="button"
+              >
+                <ThemedText type="small" themeColor="accent" style={styles.back}>
+                  Use a different email
+                </ThemedText>
+              </Pressable>
+            </View>
+          )}
+
+          {offline && !problem ? (
+            <View style={[styles.problem, { borderLeftColor: theme.textFaint }]}>
+              <ThemedText type="small" themeColor="textSecondary">
+                Can’t reach the server just now. Signing in needs a connection —
+                reading does not, once you are in.
+              </ThemedText>
+            </View>
+          ) : null}
+
+          {problem ? (
+            <View style={[styles.problem, { borderLeftColor: theme.redLetter }]}>
+              <ThemedText type="small" style={{ color: theme.redLetter }}>
+                {problem}
+              </ThemedText>
+            </View>
+          ) : null}
+        </SafeAreaView>
+      </KeyboardAvoidingView>
     </ThemedView>
   );
 }
@@ -234,10 +256,10 @@ function Action({
 
 const styles = StyleSheet.create({
   screen: { flex: 1, flexDirection: 'row', justifyContent: 'center' },
+  avoider: { flex: 1, width: '100%', maxWidth: MaxContentWidth },
   container: {
     flex: 1,
     width: '100%',
-    maxWidth: MaxContentWidth,
     paddingHorizontal: Spacing.four,
     justifyContent: 'center',
     gap: Spacing.five,
