@@ -9,6 +9,10 @@
 
 import { supabase } from '@/supabase/client';
 
+/** Every column the app reads off a circle, in one place so they cannot drift. */
+const CIRCLE_COLUMNS =
+  'id, name, kind, join_code, created_by, plan_id, plan_started_on, plan_name, plan_books, plan_days';
+
 export type CircleKind = 'couple' | 'family' | 'friends';
 
 export const CIRCLE_KINDS: readonly { id: CircleKind; name: string; blurb: string }[] = [
@@ -29,6 +33,10 @@ export type Circle = {
    */
   readonly planId?: string;
   readonly planStartedOn?: string;
+  /** Set only when `planId` is 'custom': the circle made this one up itself. */
+  readonly planName?: string;
+  readonly planBooks?: readonly number[];
+  readonly planDays?: number;
 };
 
 export type Member = {
@@ -45,6 +53,9 @@ type CircleRow = {
   created_by: string;
   plan_id?: string | null;
   plan_started_on?: string | null;
+  plan_name?: string | null;
+  plan_books?: number[] | null;
+  plan_days?: number | null;
 };
 
 const toCircle = (row: CircleRow): Circle => ({
@@ -55,13 +66,16 @@ const toCircle = (row: CircleRow): Circle => ({
   createdBy: row.created_by,
   planId: row.plan_id ?? undefined,
   planStartedOn: row.plan_started_on ?? undefined,
+  planName: row.plan_name ?? undefined,
+  planBooks: row.plan_books ?? undefined,
+  planDays: row.plan_days ?? undefined,
 });
 
 /** The circles you belong to. RLS makes the filter unnecessary. */
 export async function myCircles(): Promise<Circle[]> {
   const { data, error } = await supabase
     .from('circles')
-    .select('id, name, kind, join_code, created_by, plan_id, plan_started_on')
+    .select(CIRCLE_COLUMNS)
     .order('created_at');
   if (error) throw new Error(error.message);
   return (data ?? []).map(toCircle);
@@ -75,7 +89,7 @@ export async function createCircle(name: string, kind: CircleKind): Promise<Circ
   const { data, error } = await supabase
     .from('circles')
     .insert({ name: name.trim(), kind, created_by: id })
-    .select('id, name, kind, join_code, created_by, plan_id, plan_started_on')
+    .select(CIRCLE_COLUMNS)
     .single();
   if (error) throw new Error(error.message);
   return toCircle(data);
@@ -247,9 +261,45 @@ export async function setCirclePlan(circleId: string, planId: string | undefined
     .from('circles')
     .update(
       planId
-        ? { plan_id: planId, plan_started_on: today }
-        : { plan_id: null, plan_started_on: null },
+        ? {
+            plan_id: planId,
+            plan_started_on: today,
+            // Choosing a preset clears any custom one, or the old definition
+            // would sit behind it waiting to reappear.
+            plan_name: null,
+            plan_books: null,
+            plan_days: null,
+          }
+        : {
+            plan_id: null,
+            plan_started_on: null,
+            plan_name: null,
+            plan_books: null,
+            plan_days: null,
+          },
     )
+    .eq('id', circleId);
+  if (error) throw new Error(error.message);
+}
+
+/**
+ * A plan the circle made up: some books, over some days, under a name they
+ * chose. `plan_id` is the literal 'custom', which is what tells the reader the
+ * definition is in the columns beside it rather than in the catalogue.
+ */
+export async function setCustomCirclePlan(
+  circleId: string,
+  plan: { name: string; books: readonly number[]; days: number },
+): Promise<void> {
+  const { error } = await supabase
+    .from('circles')
+    .update({
+      plan_id: 'custom',
+      plan_started_on: new Date().toISOString().slice(0, 10),
+      plan_name: plan.name.trim(),
+      plan_books: [...plan.books].sort((a, b) => a - b),
+      plan_days: plan.days,
+    })
     .eq('id', circleId);
   if (error) throw new Error(error.message);
 }

@@ -33,10 +33,6 @@ import {
 import { pullCircleReading, pushMine, type MemberReading } from '@/sync/sync';
 import { today } from '@/progress/store';
 
-function leave(): void {
-  if (router.canGoBack()) router.back();
-  else router.replace('/');
-}
 
 export default function CircleScreen() {
   const theme = useTheme();
@@ -146,13 +142,6 @@ export default function CircleScreen() {
   return (
     <Ground style={styles.screen} scroll={scrolled}>
       <SafeAreaView style={styles.container}>
-        <View style={styles.topBar}>
-          <Pressable onPress={leave} accessibilityRole="button" style={styles.leaveBtn}>
-            <ThemedText type="small" themeColor="accent">
-              ‹ Today
-            </ThemedText>
-          </Pressable>
-        </View>
 
         <Animated.ScrollView
           onScroll={onScroll}
@@ -427,6 +416,74 @@ export default function CircleScreen() {
                     style={{ color: code.length >= 4 ? theme.background : theme.textFaint }}
                   >
                     Join
+                  </ThemedText>
+                </Pressable>
+              </Card>
+
+              <Card style={styles.card}>
+                <ThemedText type="small" themeColor="textFaint" style={styles.eyebrow}>
+                  Start another
+                </ThemedText>
+                <TextInput
+                  value={name}
+                  onChangeText={setName}
+                  placeholder="The Hendersons"
+                  placeholderTextColor={theme.textFaint}
+                  style={[
+                    styles.input,
+                    { color: theme.text, borderColor: theme.border, fontFamily: Fonts.serif },
+                  ]}
+                />
+                <View style={styles.kinds}>
+                  {CIRCLE_KINDS.map((option) => {
+                    const on = option.id === kind;
+                    return (
+                      <Pressable
+                        key={option.id}
+                        onPress={() => setKind(option.id)}
+                        accessibilityRole="button"
+                        accessibilityState={{ selected: on }}
+                        style={[
+                          styles.kind,
+                          {
+                            backgroundColor: on ? theme.accentSoft : theme.backgroundElement,
+                            borderColor: on ? theme.accent : theme.border,
+                          },
+                        ]}
+                      >
+                        <ThemedText type="small" themeColor={on ? 'accent' : 'textSecondary'}>
+                          {option.name}
+                        </ThemedText>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+                <Pressable
+                  onPress={() =>
+                    run('create', () =>
+                      createCircle(name, kind).then((made) => {
+                        setName('');
+                        choose(made.id);
+                      }),
+                    )
+                  }
+                  disabled={name.trim().length === 0 || busy !== undefined}
+                  accessibilityRole="button"
+                  style={[
+                    styles.action,
+                    {
+                      backgroundColor:
+                        name.trim().length > 0 ? theme.accent : theme.backgroundSelected,
+                    },
+                  ]}
+                >
+                  <ThemedText
+                    type="smallBold"
+                    style={{
+                      color: name.trim().length > 0 ? theme.background : theme.textFaint,
+                    }}
+                  >
+                    Create the circle
                   </ThemedText>
                 </Pressable>
               </Card>

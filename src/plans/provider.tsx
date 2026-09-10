@@ -23,7 +23,9 @@ import {
   type ReactNode,
 } from 'react';
 
-import { dayOfPlan, type Plan } from '@/bible/plan.ts';
+import { customPlan, dayOfPlan, type Plan } from '@/bible/plan.ts';
+import { bookRange } from '@/bible/versification.ts';
+import type { VerseRange } from '@/bible/verse-id.ts';
 import { useAuth } from '@/auth/provider';
 import { useCircle } from '@/circles/provider';
 import { setCirclePlan } from '@/circles/store';
@@ -102,7 +104,19 @@ export function PlanProvider({ children }: { readonly children: ReactNode }) {
     [circle, mine, refresh],
   );
 
-  const plan = shared ? getPlan(circle.planId) : getPlan(id);
+  // 'custom' is the marker that the circle wrote its own: the definition is in
+  // the columns beside it rather than in the catalogue.
+  const plan = !shared
+    ? getPlan(id)
+    : circle.planId === 'custom'
+      ? customPlan(
+          circle.planName ?? 'Our plan',
+          (circle.planBooks ?? [])
+            .map((book) => bookRange(book))
+            .filter((range): range is VerseRange => range !== undefined),
+          circle.planDays ?? 1,
+        )
+      : getPlan(circle.planId);
   const from = shared ? parseDate(circle.planStartedOn ?? null) : startedOn;
   const day = Math.max(1, dayOfPlan(from, new Date()));
 

@@ -5,7 +5,7 @@
  * asking "where was that thing I starred?" rather than browsing a book.
  */
 
-import { Link, router } from 'expo-router';
+import { Link } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { useAnimatedScrollHandler, useSharedValue } from 'react-native-reanimated';
@@ -23,10 +23,6 @@ import { MARK_TINTS, useMarks } from '@/marks/provider';
 
 type Tab = 'highlights' | 'favourites' | 'notes';
 
-function leave(): void {
-  if (router.canGoBack()) router.back();
-  else router.replace('/');
-}
 
 /** Every entry links back to the passage it belongs to. */
 function Passage({ range, children }: { readonly range: VerseRange; readonly children: React.ReactNode }) {
@@ -70,13 +66,6 @@ export default function MarkedScreen() {
   return (
     <Ground style={styles.screen} scroll={scrolled}>
       <SafeAreaView style={styles.container}>
-        <View style={styles.topBar}>
-          <Pressable onPress={leave} accessibilityRole="button" style={styles.leave}>
-            <ThemedText type="small" themeColor="accent">
-              ‹ Today
-            </ThemedText>
-          </Pressable>
-        </View>
 
         <Animated.ScrollView
           onScroll={onScroll}

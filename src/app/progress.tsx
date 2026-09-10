@@ -7,7 +7,7 @@
  * `bookVerseTotal` exists.
  */
 
-import { Link, router } from 'expo-router';
+import { Link } from 'expo-router';
 import { Fragment, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { useAnimatedScrollHandler, useSharedValue } from 'react-native-reanimated';
@@ -35,10 +35,6 @@ import { usePlan } from '@/plans/provider';
 import { carryOnAt, portionFor } from '@/bible/plan.ts';
 import { formatReference } from '@/bible/reference.ts';
 
-function leave(): void {
-  if (router.canGoBack()) router.back();
-  else router.replace('/');
-}
 
 export default function ProgressScreen() {
   const theme = useTheme();
@@ -68,13 +64,6 @@ export default function ProgressScreen() {
   return (
     <Ground style={styles.screen} scroll={scrolled}>
       <SafeAreaView style={styles.container}>
-        <View style={styles.topBar}>
-          <Pressable onPress={leave} accessibilityRole="button" style={styles.leave}>
-            <ThemedText type="small" themeColor="accent">
-              ‹ Today
-            </ThemedText>
-          </Pressable>
-        </View>
 
         <Animated.ScrollView
           onScroll={onScroll}

@@ -779,6 +779,56 @@ describe('a plan the circle shares, and a circle that outlives its owner', () =>
     assert.ok(error, 'both or neither');
   });
 
+  test('a circle can write its own plan', async () => {
+    const { error } = await anna.db
+      .from('circles')
+      .update({
+        plan_id: 'custom',
+        plan_started_on: '2026-09-10',
+        plan_name: 'The Gospels over Lent',
+        plan_books: [40, 41, 42, 43],
+        plan_days: 47,
+      })
+      .eq('id', planCircle);
+    assert.equal(error, null, error?.message ?? 'expected no error');
+
+    const { data } = await sam.db
+      .from('circles')
+      .select('plan_id, plan_name, plan_books, plan_days')
+      .eq('id', planCircle)
+      .single();
+    assert.equal(data?.plan_name, 'The Gospels over Lent');
+    assert.deepEqual(data?.plan_books, [40, 41, 42, 43], 'everyone in it reads the same books');
+  });
+
+  test('a custom plan with no books is a name, not a plan', async () => {
+    const { error } = await anna.db
+      .from('circles')
+      .update({
+        plan_id: 'custom',
+        plan_started_on: '2026-09-10',
+        plan_name: 'Nothing at all',
+        plan_books: [],
+        plan_days: 10,
+      })
+      .eq('id', planCircle);
+    assert.ok(error, 'the completeness check holds');
+  });
+
+  test('and a book that is not in the Bible is refused', async () => {
+    const { error } = await anna.db
+      .from('circles')
+      .update({
+        plan_id: 'custom',
+        plan_started_on: '2026-09-10',
+        plan_name: 'Book sixty-seven',
+        plan_books: [67],
+        plan_days: 10,
+      })
+      .eq('id', planCircle);
+    assert.ok(error, 'book numbers are the first component of every verse id');
+  });
+
   test('leaving hands the circle to whoever has been in it longest', async () => {
     await anna.db
       .from('circle_members')

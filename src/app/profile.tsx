@@ -6,7 +6,6 @@
  * someone write an address they had never proved they owned.
  */
 
-import { router } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { useAnimatedScrollHandler, useSharedValue } from 'react-native-reanimated';
@@ -19,10 +18,6 @@ import { Fonts, MaxContentWidth, Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useAuth } from '@/auth/provider';
 
-function leave(): void {
-  if (router.canGoBack()) router.back();
-  else router.replace('/');
-}
 
 export default function ProfileScreen() {
   const theme = useTheme();
@@ -81,13 +76,6 @@ export default function ProfileScreen() {
   return (
     <Ground scroll={scrolled}>
       <SafeAreaView style={styles.frame}>
-        <View style={styles.topBar}>
-          <Pressable onPress={leave} accessibilityRole="button" style={styles.leave}>
-            <ThemedText type="small" themeColor="accent">
-              ‹ Back
-            </ThemedText>
-          </Pressable>
-        </View>
 
         <Animated.ScrollView
           onScroll={onScroll}
