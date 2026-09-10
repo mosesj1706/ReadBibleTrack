@@ -28,11 +28,177 @@ import {
   joinByCode,
   leaveCircle,
   removeMember,
+  setCirclePlan,
   type CircleKind,
 } from '@/circles/store';
+import { PLANS } from '@/plans/catalogue';
 import { pullCircleReading, pushMine, type MemberReading } from '@/sync/sync';
 import { today } from '@/progress/store';
 
+
+/**
+ * Starting a circle: what to call it, what kind it is, and what it will read.
+ *
+ * One component for both the first circle and every one after it. They were
+ * two copies of the same form for about an hour, which is how the second one
+ * came to be missing the plan chooser that this whole card exists to offer.
+ *
+ * The plan is offered here because agreeing what to read is part of starting a
+ * circle, not an errand afterwards. Building one from scratch needs the circle
+ * to exist first — it is stored on it — so that button makes the circle and
+ * then opens the builder.
+ */
+function StartCircle({
+  title,
+  busy,
+  onCreate,
+}: {
+  readonly title: string;
+  readonly busy: boolean;
+  readonly onCreate: (
+    name: string,
+    kind: CircleKind,
+    planId: string | undefined,
+    thenBuildYourOwn: boolean,
+  ) => void;
+}) {
+  const theme = useTheme();
+  const [name, setName] = useState('');
+  const [kind, setKind] = useState<CircleKind>('family');
+  const [planId, setPlanId] = useState<string | undefined>(undefined);
+  const ready = name.trim().length > 0 && !busy;
+  const blurb = CIRCLE_KINDS.find((option) => option.id === kind)?.blurb;
+
+  return (
+    <Card style={styles.card}>
+      <ThemedText type="small" themeColor="textFaint" style={styles.eyebrow}>
+        {title}
+      </ThemedText>
+
+      <TextInput
+        value={name}
+        onChangeText={setName}
+        placeholder="The Hendersons"
+        placeholderTextColor={theme.textFaint}
+        maxLength={60}
+        style={[
+          styles.input,
+          { color: theme.text, borderColor: theme.border, fontFamily: Fonts.serif },
+        ]}
+      />
+
+      <View style={styles.kinds}>
+        {CIRCLE_KINDS.map((option) => {
+          const on = option.id === kind;
+          return (
+            <Pressable
+              key={option.id}
+              onPress={() => setKind(option.id)}
+              accessibilityRole="button"
+              accessibilityState={{ selected: on }}
+              style={[
+                styles.kind,
+                {
+                  backgroundColor: on ? theme.accentSoft : theme.backgroundElement,
+                  borderColor: on ? theme.accent : theme.border,
+                },
+              ]}
+            >
+              <ThemedText type="small" themeColor={on ? 'accent' : 'textSecondary'}>
+                {option.name}
+              </ThemedText>
+            </Pressable>
+          );
+        })}
+      </View>
+      {blurb ? (
+        <ThemedText type="small" themeColor="textSecondary">
+          {blurb}
+        </ThemedText>
+      ) : null}
+
+      <ThemedText type="small" themeColor="textFaint" style={styles.eyebrow}>
+        What will you read?
+      </ThemedText>
+      <View style={styles.kinds}>
+        <Pressable
+          onPress={() => setPlanId(undefined)}
+          accessibilityRole="button"
+          accessibilityState={{ selected: planId === undefined }}
+          style={[
+            styles.kind,
+            {
+              backgroundColor:
+                planId === undefined ? theme.accentSoft : theme.backgroundElement,
+              borderColor: planId === undefined ? theme.accent : theme.border,
+            },
+          ]}
+        >
+          <ThemedText
+            type="small"
+            themeColor={planId === undefined ? 'accent' : 'textSecondary'}
+          >
+            Everyone keeps their own
+          </ThemedText>
+        </Pressable>
+        {PLANS.filter((plan) => plan.kind !== 'open').map((plan) => {
+          const on = plan.id === planId;
+          return (
+            <Pressable
+              key={plan.id}
+              onPress={() => setPlanId(plan.id)}
+              accessibilityRole="button"
+              accessibilityState={{ selected: on }}
+              style={[
+                styles.kind,
+                {
+                  backgroundColor: on ? theme.accentSoft : theme.backgroundElement,
+                  borderColor: on ? theme.accent : theme.border,
+                },
+              ]}
+            >
+              <ThemedText type="small" themeColor={on ? 'accent' : 'textSecondary'}>
+                {plan.name}
+              </ThemedText>
+            </Pressable>
+          );
+        })}
+      </View>
+
+      <Pressable
+        onPress={() => onCreate(name, kind, planId, false)}
+        disabled={!ready}
+        accessibilityRole="button"
+        style={[
+          styles.action,
+          { backgroundColor: ready ? theme.accent : theme.backgroundSelected },
+        ]}
+      >
+        {busy ? (
+          <ActivityIndicator color={theme.background} />
+        ) : (
+          <ThemedText
+            type="smallBold"
+            style={{ color: ready ? theme.background : theme.textFaint }}
+          >
+            Create the circle
+          </ThemedText>
+        )}
+      </Pressable>
+
+      <Pressable
+        onPress={() => onCreate(name, kind, undefined, true)}
+        disabled={!ready}
+        accessibilityRole="button"
+        style={styles.quiet}
+      >
+        <ThemedText type="small" themeColor={ready ? 'accent' : 'textFaint'}>
+          Or build a plan of your own
+        </ThemedText>
+      </Pressable>
+    </Card>
+  );
+}
 
 export default function CircleScreen() {
   const theme = useTheme();
@@ -68,8 +234,6 @@ export default function CircleScreen() {
   const [removing, setRemoving] = useState<string | undefined>();
   const [leaving, setLeaving] = useState(false);
 
-  const [name, setName] = useState('');
-  const [kind, setKind] = useState<CircleKind>('family');
   const [code, setCode] = useState('');
 
   const load = useCallback(async () => {
@@ -109,6 +273,23 @@ export default function CircleScreen() {
     } finally {
       setBusy(undefined);
     }
+  }
+
+  function startCircle(
+    name: string,
+    kind: CircleKind,
+    planId: string | undefined,
+    thenBuildYourOwn: boolean,
+  ) {
+    void run('create', async () => {
+      const made = await createCircle(name, kind);
+      // The plan is set after the circle exists, because it is stored on it.
+      if (planId) await setCirclePlan(made.id, planId);
+      choose(made.id);
+      // Building one from scratch needs the 66 books and a number of days,
+      // which is a screen of its own rather than a third card here.
+      if (thenBuildYourOwn) router.push('/plan');
+    });
   }
 
   // The circle's progress is the union of everyone's ranges — one set, not a
@@ -420,73 +601,11 @@ export default function CircleScreen() {
                 </Pressable>
               </Card>
 
-              <Card style={styles.card}>
-                <ThemedText type="small" themeColor="textFaint" style={styles.eyebrow}>
-                  Start another
-                </ThemedText>
-                <TextInput
-                  value={name}
-                  onChangeText={setName}
-                  placeholder="The Hendersons"
-                  placeholderTextColor={theme.textFaint}
-                  style={[
-                    styles.input,
-                    { color: theme.text, borderColor: theme.border, fontFamily: Fonts.serif },
-                  ]}
-                />
-                <View style={styles.kinds}>
-                  {CIRCLE_KINDS.map((option) => {
-                    const on = option.id === kind;
-                    return (
-                      <Pressable
-                        key={option.id}
-                        onPress={() => setKind(option.id)}
-                        accessibilityRole="button"
-                        accessibilityState={{ selected: on }}
-                        style={[
-                          styles.kind,
-                          {
-                            backgroundColor: on ? theme.accentSoft : theme.backgroundElement,
-                            borderColor: on ? theme.accent : theme.border,
-                          },
-                        ]}
-                      >
-                        <ThemedText type="small" themeColor={on ? 'accent' : 'textSecondary'}>
-                          {option.name}
-                        </ThemedText>
-                      </Pressable>
-                    );
-                  })}
-                </View>
-                <Pressable
-                  onPress={() =>
-                    run('create', () =>
-                      createCircle(name, kind).then((made) => {
-                        setName('');
-                        choose(made.id);
-                      }),
-                    )
-                  }
-                  disabled={name.trim().length === 0 || busy !== undefined}
-                  accessibilityRole="button"
-                  style={[
-                    styles.action,
-                    {
-                      backgroundColor:
-                        name.trim().length > 0 ? theme.accent : theme.backgroundSelected,
-                    },
-                  ]}
-                >
-                  <ThemedText
-                    type="smallBold"
-                    style={{
-                      color: name.trim().length > 0 ? theme.background : theme.textFaint,
-                    }}
-                  >
-                    Create the circle
-                  </ThemedText>
-                </Pressable>
-              </Card>
+              <StartCircle
+                title="Start another"
+                busy={busy !== undefined}
+                onCreate={startCircle}
+              />
 
               {/* Two taps, like deleting an account. One quiet tap used to be
                   enough to put you out of the circle with no warning, and the
@@ -548,71 +667,11 @@ export default function CircleScreen() {
 
               <View style={wide ? styles.choices : undefined}>
               <Rise style={wide ? styles.choice : undefined}>
-              <Card style={styles.card}>
-                <ThemedText type="small" themeColor="textFaint" style={styles.eyebrow}>
-                  Start one
-                </ThemedText>
-                <TextInput
-                  value={name}
-                  onChangeText={setName}
-                  placeholder="The Hendersons"
-                  placeholderTextColor={theme.textFaint}
-                  maxLength={60}
-                  style={[
-                    styles.input,
-                    { color: theme.text, borderColor: theme.border, fontFamily: Fonts.serif },
-                  ]}
-                />
-                <View style={styles.kinds}>
-                  {CIRCLE_KINDS.map((option) => {
-                    const on = kind === option.id;
-                    return (
-                      <Pressable
-                        key={option.id}
-                        onPress={() => setKind(option.id)}
-                        accessibilityRole="button"
-                        accessibilityState={{ selected: on }}
-                        style={[
-                          styles.kind,
-                          {
-                            backgroundColor: on ? theme.accentSoft : theme.background,
-                            borderColor: on ? theme.accent : theme.border,
-                          },
-                        ]}
-                      >
-                        <ThemedText type="small" themeColor={on ? 'accent' : 'textSecondary'}>
-                          {option.name}
-                        </ThemedText>
-                      </Pressable>
-                    );
-                  })}
-                </View>
-                <ThemedText type="small" themeColor="textFaint">
-                  {CIRCLE_KINDS.find((k) => k.id === kind)?.blurb}
-                </ThemedText>
-                <Pressable
-                  onPress={() => run('create', () => createCircle(name, kind))}
-                  disabled={!name.trim() || busy !== undefined}
-                  accessibilityRole="button"
-                  style={[
-                    styles.action,
-                    {
-                      backgroundColor: name.trim() ? theme.accent : theme.backgroundSelected,
-                    },
-                  ]}
-                >
-                  {busy === 'create' ? (
-                    <ActivityIndicator color={theme.background} />
-                  ) : (
-                    <ThemedText
-                      type="smallBold"
-                      style={{ color: name.trim() ? theme.background : theme.textFaint }}
-                    >
-                      Create the circle
-                    </ThemedText>
-                  )}
-                </Pressable>
-              </Card>
+              <StartCircle
+                title="Start one"
+                busy={busy !== undefined}
+                onCreate={startCircle}
+              />
               </Rise>
 
               <Rise delay={80} style={wide ? styles.choice : undefined}>
