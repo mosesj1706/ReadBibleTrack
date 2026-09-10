@@ -1,5 +1,5 @@
 /**
- * What the circle has shared, and who shared it.
+ * The circles you are in, which one you are looking at, and what they shared.
  *
  * Kept apart from `MarksProvider`, which owns what is on this device. These
  * are other people's marks: they arrive over the network, they can fail to
@@ -9,8 +9,16 @@
  * Silence is the failure mode on purpose. Someone reading on a train with no
  * signal should see their own chapter exactly as usual, not an error where
  * their circle would have been.
+ *
+ * A person can be in more than one — a couple and a house group are not the
+ * same circle and should not have to be. One of them is "active": the one the
+ * Circle screen shows and the one whose plan, if it has agreed one, everybody
+ * in it reads. Names are gathered across all of them, because a shared note
+ * arriving from the house group still needs a name against it while you are
+ * looking at the couple.
  */
 
+import Storage from 'expo-sqlite/kv-store';
 import {
   createContext,
   useCallback,
@@ -29,11 +37,23 @@ import {
   myCircles,
   reportContent,
   unblockPerson,
+  type Circle,
+  type Member,
   type ReportedContent,
 } from './store';
 import { pullCircleMarks, pullCircleNotes, type CircleMark, type CircleNote } from '@/sync/sync';
 
+/** Which circle was last being looked at, so the app opens where you left it. */
+const ACTIVE_KEY = 'circle.active';
+
 type CircleValue = {
+  /** Every circle you belong to, oldest first. */
+  readonly circles: readonly Circle[];
+  /** The one being looked at, or undefined when you are in none. */
+  readonly circle: Circle | undefined;
+  readonly choose: (circleId: string) => void;
+  /** Who is in the active circle. */
+  readonly members: readonly Member[];
   /** Marks other people have chosen to show, touching a range. */
   readonly marksIn: (range: VerseRange) => readonly CircleMark[];
   readonly notesIn: (range: VerseRange) => readonly CircleNote[];
@@ -54,36 +74,50 @@ const touches = (range: VerseRange, item: { start: number; end: number }) =>
   item.start <= range.end && item.end >= range.start;
 
 export function CircleProvider({ children }: { readonly children: ReactNode }) {
+  const [circles, setCircles] = useState<readonly Circle[]>([]);
+  const [activeId, setActiveId] = useState<string | undefined>(undefined);
+  const [members, setMembers] = useState<readonly Member[]>([]);
   const [marks, setMarks] = useState<readonly CircleMark[]>([]);
   const [notes, setNotes] = useState<readonly CircleNote[]>([]);
   const [names, setNames] = useState<ReadonlyMap<string, string>>(new Map());
-  const [inACircle, setInACircle] = useState(false);
   const [blocked, setBlocked] = useState<ReadonlySet<string>>(new Set());
 
   const refresh = useCallback(() => {
     void (async () => {
       try {
-        const circles = await myCircles();
-        const first = circles[0];
-        if (!first) {
-          setInACircle(false);
+        const mine = await myCircles();
+        setCircles(mine);
+        if (mine.length === 0) {
+          setMembers([]);
           setMarks([]);
           setNotes([]);
           setNames(new Map());
           setBlocked(new Set());
           return;
         }
-        setInACircle(true);
-        // The server already withholds a blocked person's marks and notes —
-        // this list is only so the circle screen can show who is blocked and
-        // offer to undo it.
-        const [people, theirMarks, theirNotes, blocks] = await Promise.all([
-          membersOf(first.id),
+
+        // A remembered choice that is no longer one of your circles — you left
+        // it, or were removed — falls back to the first rather than showing an
+        // empty screen for a circle that is not there.
+        const remembered = await Storage.getItem(ACTIVE_KEY);
+        const chosen =
+          mine.find((c) => c.id === remembered) ?? mine.find((c) => c.id === activeId) ?? mine[0];
+        setActiveId(chosen.id);
+
+        const [everyone, theirMarks, theirNotes, blocks] = await Promise.all([
+          Promise.all(mine.map((circle) => membersOf(circle.id))),
           pullCircleMarks(),
           pullCircleNotes(),
           blockedPeople(),
         ]);
-        setNames(new Map(people.map((person) => [person.userId, person.displayName])));
+
+        // Names from every circle; membership only from the active one.
+        const named = new Map<string, string>();
+        for (const list of everyone) {
+          for (const person of list) named.set(person.userId, person.displayName);
+        }
+        setNames(named);
+        setMembers(everyone[mine.indexOf(chosen)] ?? []);
         setMarks(theirMarks);
         setNotes(theirNotes);
         setBlocked(new Set(blocks));
@@ -92,11 +126,26 @@ export function CircleProvider({ children }: { readonly children: ReactNode }) {
         // with this person's own marks, which is the important half.
       }
     })();
+    // `activeId` is read as a fallback only; depending on it would refetch
+    // everything each time the choice changed, which `choose` already does.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
     refresh();
   }, [refresh]);
+
+  const choose = useCallback(
+    (circleId: string) => {
+      setActiveId(circleId);
+      void Storage.setItem(ACTIVE_KEY, circleId);
+      const found = circles.find((c) => c.id === circleId);
+      if (found) void membersOf(found.id).then(setMembers, () => {});
+    },
+    [circles],
+  );
+
+  const circle = circles.find((c) => c.id === activeId) ?? circles[0];
 
   const marksIn = useCallback(
     (range: VerseRange) => marks.filter((mark) => touches(range, mark)),
@@ -133,8 +182,35 @@ export function CircleProvider({ children }: { readonly children: ReactNode }) {
   }, []);
 
   const value = useMemo(
-    () => ({ marksIn, notesIn, nameOf, refresh, inACircle, isBlocked, block, unblock, report }),
-    [marksIn, notesIn, nameOf, refresh, inACircle, isBlocked, block, unblock, report],
+    () => ({
+      circles,
+      circle,
+      choose,
+      members,
+      marksIn,
+      notesIn,
+      nameOf,
+      refresh,
+      inACircle: circles.length > 0,
+      isBlocked,
+      block,
+      unblock,
+      report,
+    }),
+    [
+      circles,
+      circle,
+      choose,
+      members,
+      marksIn,
+      notesIn,
+      nameOf,
+      refresh,
+      isBlocked,
+      block,
+      unblock,
+      report,
+    ],
   );
 
   return <CircleContext.Provider value={value}>{children}</CircleContext.Provider>;

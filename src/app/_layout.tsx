@@ -37,9 +37,12 @@ export default function RootLayout() {
         <AuthGate>
           <ScriptureProvider>
             <ProgressProvider>
-              <PlanProvider>
-                <MarksProvider>
-                  <CircleProvider>
+              {/* Circles above the plan, because a circle can agree a plan and
+                  everyone in it then reads that one. The provider that owns
+                  the answer has to sit above the one that asks. */}
+              <CircleProvider>
+                <PlanProvider>
+                  <MarksProvider>
                   <SyncOnStart />
                   <AppNavigation>
                     <Stack
@@ -63,9 +66,9 @@ export default function RootLayout() {
                       })}
                     />
                   </AppNavigation>
-                  </CircleProvider>
-                </MarksProvider>
-              </PlanProvider>
+                  </MarksProvider>
+                </PlanProvider>
+              </CircleProvider>
             </ProgressProvider>
           </ScriptureProvider>
         </AuthGate>

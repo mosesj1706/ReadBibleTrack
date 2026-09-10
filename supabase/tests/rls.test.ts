@@ -718,6 +718,140 @@ describe('reporting and blocking', () => {
   });
 });
 
+describe('a plan the circle shares, and a circle that outlives its owner', () => {
+  let planCircle = '';
+  let planCode = '';
+
+  test('the owner puts a plan on the circle', async () => {
+    const { data, error } = await anna.db
+      .from('circles')
+      .insert({ name: 'Morning readers', created_by: anna.id })
+      .select('id, join_code')
+      .single();
+    assert.equal(error, null, error?.message ?? 'expected no error');
+    assert.ok(data);
+    planCircle = data.id;
+    planCode = data.join_code;
+
+    const set = await anna.db
+      .from('circles')
+      .update({ plan_id: 'gospels-40', plan_started_on: '2026-09-01' })
+      .eq('id', planCircle);
+    assert.equal(set.error, null, set.error?.message ?? 'expected no error');
+
+    const { data: seen } = await anna.db
+      .from('circles')
+      .select('plan_id, plan_started_on')
+      .eq('id', planCircle)
+      .single();
+    assert.equal(seen?.plan_id, 'gospels-40');
+    assert.equal(seen?.plan_started_on, '2026-09-01');
+  });
+
+  test('everyone in it reads the same plan, and only the owner may change it', async () => {
+    const joined = await sam.db.rpc('join_circle', { code: planCode });
+    assert.equal(joined.error, null, joined.error?.message ?? 'expected no error');
+
+    const { data: sees } = await sam.db
+      .from('circles')
+      .select('plan_id')
+      .eq('id', planCircle)
+      .single();
+    assert.equal(sees?.plan_id, 'gospels-40', 'a member reads the circle’s plan');
+
+    await sam.db
+      .from('circles')
+      .update({ plan_id: 'nt-90', plan_started_on: '2026-09-02' })
+      .eq('id', planCircle);
+    const { data: after } = await anna.db
+      .from('circles')
+      .select('plan_id')
+      .eq('id', planCircle)
+      .single();
+    assert.equal(after?.plan_id, 'gospels-40', 'a member cannot move everyone else’s plan');
+  });
+
+  test('a plan with no start date has no day one', async () => {
+    const { error } = await anna.db
+      .from('circles')
+      .update({ plan_id: 'nt-90', plan_started_on: null })
+      .eq('id', planCircle);
+    assert.ok(error, 'both or neither');
+  });
+
+  test('leaving hands the circle to whoever has been in it longest', async () => {
+    await anna.db
+      .from('circle_members')
+      .delete()
+      .eq('circle_id', planCircle)
+      .eq('user_id', anna.id);
+
+    const { data: role } = await sam.db
+      .from('circle_members')
+      .select('role')
+      .eq('circle_id', planCircle)
+      .eq('user_id', sam.id)
+      .single();
+    assert.equal(role?.role, 'owner', 'the circle is not left ownerless');
+
+    const { data: circle } = await sam.db
+      .from('circles')
+      .select('created_by')
+      .eq('id', planCircle)
+      .single();
+    assert.equal(circle?.created_by, sam.id, 'and the row agrees');
+  });
+
+  test('coming back after that makes you a member, not the owner again', async () => {
+    await anna.db.rpc('join_circle', { code: planCode });
+    const { data } = await anna.db
+      .from('circle_members')
+      .select('role')
+      .eq('circle_id', planCircle)
+      .eq('user_id', anna.id)
+      .single();
+    assert.equal(data?.role, 'member', 'Sam owns it now; ownership does not bounce back');
+  });
+
+  test('but a founder of an ownerless circle gets it back', async () => {
+    // The state left behind by circles that lost their owner before the
+    // trigger above existed: `created_by` still names them, and nobody is
+    // owner. The demo circle was in exactly this state.
+    // Staged after the delete, not before: deleting a membership fires the
+    // handover trigger, which would promote Sam and rewrite `created_by`
+    // again — the state being simulated here cannot arise on its own any
+    // more, which is the point of the trigger.
+    await admin
+      .from('circle_members')
+      .delete()
+      .eq('circle_id', planCircle)
+      .eq('user_id', anna.id);
+    await admin.from('circle_members').update({ role: 'member' }).eq('circle_id', planCircle);
+    await admin.from('circles').update({ created_by: anna.id }).eq('id', planCircle);
+
+    await anna.db.rpc('join_circle', { code: planCode });
+    const { data } = await anna.db
+      .from('circle_members')
+      .select('role')
+      .eq('circle_id', planCircle)
+      .eq('user_id', anna.id)
+      .single();
+    assert.equal(data?.role, 'owner', 'coming home to your own circle restores it');
+  });
+
+  test('and a circle the last person walks out of is not kept', async () => {
+    const { data: made } = await ruth.db
+      .from('circles')
+      .insert({ name: 'Just me', created_by: ruth.id })
+      .select('id')
+      .single();
+    assert.ok(made);
+    await ruth.db.from('circle_members').delete().eq('circle_id', made.id).eq('user_id', ruth.id);
+    const { data } = await admin.from('circles').select('id').eq('id', made.id);
+    assert.deepEqual(data, [], 'nobody left, so nothing left');
+  });
+});
+
 describe('deleting your own account', () => {
   test('a circle you started stays with the people still in it', async () => {
     // Anna starts a circle, Sam joins, Anna leaves for good. The circle is the

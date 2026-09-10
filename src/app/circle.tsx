@@ -11,27 +11,24 @@ import { ActivityIndicator, Pressable, Share, StyleSheet, TextInput, View, useWi
 import { useAnimatedScrollHandler, useSharedValue } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { canonSpan, normaliseRanges, type VerseRange } from '@/bible/verse-id.ts';
-import { TOTAL_VERSES, countVerses, progressThrough } from '@/bible/versification.ts';
+import { canonSpan, intersectRanges, normaliseRanges, type VerseRange } from '@/bible/verse-id.ts';
+import { portionsThrough } from '@/bible/plan.ts';
+import { countVerses, progressThrough } from '@/bible/versification.ts';
 import { Card, Ground } from '@/components/surfaces';
 import { Animated, Rise  } from '@/components/motion';
 import { ThemedText } from '@/components/themed-text';
 import { Fonts, MaxPageWidth, Spacing, WideBreakpoint } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useAuth } from '@/auth/provider';
+import { useCircle } from '@/circles/provider';
+import { usePlan } from '@/plans/provider';
 import {
   CIRCLE_KINDS,
   createCircle,
   joinByCode,
-  blockedPeople,
   leaveCircle,
-  membersOf,
-  myCircles,
   removeMember,
-  unblockPerson,
-  type Circle,
   type CircleKind,
-  type Member,
 } from '@/circles/store';
 import { pullCircleReading, pushMine, type MemberReading } from '@/sync/sync';
 import { today } from '@/progress/store';
@@ -54,16 +51,26 @@ export default function CircleScreen() {
   const { session } = useAuth();
   const me = session?.user.id;
 
-  const [circle, setCircle] = useState<Circle | undefined>();
-  const [members, setMembers] = useState<readonly Member[]>([]);
+  // The circles themselves live in the provider: the plan a circle has agreed
+  // is read from there too, so which one is active cannot be a private fact of
+  // this screen.
+  const {
+    circles,
+    circle,
+    choose,
+    members,
+    refresh: refreshCircles,
+    isBlocked,
+    unblock,
+  } = useCircle();
   const [reading, setReading] = useState<readonly MemberReading[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | undefined>();
   const [problem, setProblem] = useState<string | undefined>();
-  const [blocked, setBlocked] = useState<readonly string[]>([]);
   // Removing someone takes two taps, like deleting an account: it ends their
   // place in something shared, and cannot be undone from here.
   const [removing, setRemoving] = useState<string | undefined>();
+  const [leaving, setLeaving] = useState(false);
 
   const [name, setName] = useState('');
   const [kind, setKind] = useState<CircleKind>('family');
@@ -71,23 +78,9 @@ export default function CircleScreen() {
 
   const load = useCallback(async () => {
     try {
-      const circles = await myCircles();
-      const first = circles[0];
-      setCircle(first);
-      if (first) {
-        const [people, read, blocks] = await Promise.all([
-          membersOf(first.id),
-          pullCircleReading(),
-          blockedPeople(),
-        ]);
-        setMembers(people);
-        setReading(read);
-        setBlocked(blocks);
-      } else {
-        setMembers([]);
-        setReading([]);
-        setBlocked([]);
-      }
+      // Reading comes back for every member of every circle you are in; the
+      // screen narrows it to the people on show.
+      setReading(await pullCircleReading());
       // Cleared once the load has actually worked, not on the way in. Blanking
       // it first meant a failing reload flashed the old error away and then
       // put it straight back, and made this a synchronous state write inside
@@ -113,6 +106,7 @@ export default function CircleScreen() {
     setProblem(undefined);
     try {
       await work();
+      refreshCircles();
       await load();
     } catch (error) {
       setProblem(error instanceof Error ? error.message : 'That did not work.');
@@ -123,8 +117,20 @@ export default function CircleScreen() {
 
   // The circle's progress is the union of everyone's ranges — one set, not a
   // sum, so reading the same chapter as someone else does not count twice.
-  const together = normaliseRanges(reading.flatMap((person) => person.ranges as VerseRange[]));
-  const share = progressThrough([canonSpan()], together);
+  // Only the people on show: reading arrives for every circle you are in.
+  const here = new Set(members.map((member) => member.userId));
+  const mineToShow = reading.filter((person) => here.has(person.userId));
+  const together = normaliseRanges(mineToShow.flatMap((person) => person.ranges as VerseRange[]));
+
+  // Measured against the plan when the circle has agreed one. "412 of 1,189 in
+  // the Gospels" is a sentence about what the circle set out to do; "412 of
+  // 31,105" is a sentence about the Bible.
+  const { plan, day, sharedWith } = usePlan();
+  const planned = plan.kind !== 'open' && sharedWith !== undefined;
+  const target = planned ? portionsThrough(plan, day) : [canonSpan()];
+  const targetVerses = countVerses(target);
+  const done = planned ? intersectRanges(together, target) : together;
+  const share = progressThrough(target, done);
   const todayIso = today();
 
   if (loading) {
@@ -154,6 +160,35 @@ export default function CircleScreen() {
           contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
           {circle ? (
             <>
+              {/* Only when there is a choice to make. A single circle needs
+                  no chooser, and a row of one pill would be furniture. */}
+              {circles.length > 1 ? (
+                <View style={styles.switcher}>
+                  {circles.map((one) => {
+                    const on = one.id === circle.id;
+                    return (
+                      <Pressable
+                        key={one.id}
+                        onPress={() => choose(one.id)}
+                        accessibilityRole="button"
+                        accessibilityState={{ selected: on }}
+                        style={[
+                          styles.kind,
+                          {
+                            backgroundColor: on ? theme.accentSoft : theme.backgroundElement,
+                            borderColor: on ? theme.accent : theme.border,
+                          },
+                        ]}
+                      >
+                        <ThemedText type="small" themeColor={on ? 'accent' : 'textSecondary'}>
+                          {one.name}
+                        </ThemedText>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              ) : null}
+
               <ThemedText type="title" style={[styles.title, { fontFamily: Fonts.serif }]}>
                 {circle.name}
               </ThemedText>
@@ -168,10 +203,11 @@ export default function CircleScreen() {
                   Together
                 </ThemedText>
                 <ThemedText type="subtitle" style={{ fontFamily: Fonts.serif, fontSize: 30 }}>
-                  {countVerses(together).toLocaleString()}
+                  {countVerses(done).toLocaleString()}
                 </ThemedText>
                 <ThemedText type="small" themeColor="textSecondary">
-                  of {TOTAL_VERSES.toLocaleString()} verses · {(share * 100).toFixed(1)}%
+                  of {targetVerses.toLocaleString()} verses{planned ? ` in ${plan.name}` : ''} ·{' '}
+                  {(share * 100).toFixed(1)}%
                 </ThemedText>
                 <View style={[styles.bar, { backgroundColor: theme.backgroundSelected }]}>
                   <View
@@ -193,7 +229,7 @@ export default function CircleScreen() {
                 const theirs = reading.find((r) => r.userId === member.userId);
                 const readToday = theirs?.lastReadOn === todayIso;
                 const isMe = member.userId === me;
-                const isBlocked = blocked.includes(member.userId);
+                const blockedHere = isBlocked(member.userId);
                 const mine = circle.createdBy === me;
                 return (
                   <View
@@ -203,7 +239,15 @@ export default function CircleScreen() {
                       { backgroundColor: theme.backgroundElement, borderColor: theme.border },
                     ]}
                   >
-                    <View style={styles.memberTop}>
+                    {/* A plain Pressable rather than <Link asChild>: the Slot
+                        that Link renders through cannot take an array of
+                        styles, and finding that out cost a blank tab once. */}
+                    <Pressable
+                      onPress={() => router.push({ pathname: '/member/[id]', params: { id: member.userId } })}
+                      accessibilityRole="button"
+                      accessibilityLabel={`${member.displayName}'s reading`}
+                      style={styles.memberTop}
+                    >
                       <View
                         style={[
                           styles.dot,
@@ -226,22 +270,25 @@ export default function CircleScreen() {
                       <ThemedText type="small" themeColor="textFaint">
                         {theirs ? `${countVerses(theirs.ranges as VerseRange[])}` : '0'}
                       </ThemedText>
-                    </View>
+                      <ThemedText type="small" themeColor="textFaint">
+                        ›
+                      </ThemedText>
+                    </Pressable>
 
                     {/* Only shown where there is something to do: a block to
                         undo, or a circle of your own to remove someone from.
                         Reading stays visible either way — a block is about
                         what someone writes, not about erasing them from the
                         thing you are doing together. */}
-                    {!isMe && (isBlocked || mine) ? (
+                    {!isMe && (blockedHere || mine) ? (
                       <View style={styles.memberActions}>
-                        {isBlocked ? (
+                        {blockedHere ? (
                           <>
                             <ThemedText type="small" themeColor="textFaint">
                               You do not see what they share.
                             </ThemedText>
                             <Pressable
-                              onPress={() => run('unblock', () => unblockPerson(member.userId))}
+                              onPress={() => run('unblock', () => unblock(member.userId))}
                               accessibilityRole="button"
                               disabled={busy !== undefined}
                               style={styles.quiet}
@@ -342,15 +389,95 @@ export default function CircleScreen() {
                 )}
               </Pressable>
 
-              <Pressable
-                onPress={() => run('leave', () => leaveCircle(circle.id))}
-                accessibilityRole="button"
-                style={styles.quiet}
-              >
-                <ThemedText type="small" themeColor="textFaint">
-                  Leave this circle
+              <Card style={styles.card}>
+                <ThemedText type="small" themeColor="textFaint" style={styles.eyebrow}>
+                  Join another
                 </ThemedText>
-              </Pressable>
+                <ThemedText type="small" themeColor="textSecondary">
+                  A couple and a house group are not the same circle. You can be in both.
+                </ThemedText>
+                <TextInput
+                  value={code}
+                  onChangeText={(next) =>
+                    setCode(next.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6))
+                  }
+                  placeholder="HOUSE7"
+                  placeholderTextColor={theme.textFaint}
+                  autoCapitalize="characters"
+                  autoCorrect={false}
+                  style={[
+                    styles.input,
+                    styles.codeInput,
+                    { color: theme.text, borderColor: theme.border, fontFamily: Fonts.mono },
+                  ]}
+                />
+                <Pressable
+                  onPress={() => run('join', () => joinByCode(code).then(() => setCode('')))}
+                  disabled={code.length < 4 || busy !== undefined}
+                  accessibilityRole="button"
+                  style={[
+                    styles.action,
+                    {
+                      backgroundColor: code.length >= 4 ? theme.accent : theme.backgroundSelected,
+                    },
+                  ]}
+                >
+                  <ThemedText
+                    type="smallBold"
+                    style={{ color: code.length >= 4 ? theme.background : theme.textFaint }}
+                  >
+                    Join
+                  </ThemedText>
+                </Pressable>
+              </Card>
+
+              {/* Two taps, like deleting an account. One quiet tap used to be
+                  enough to put you out of the circle with no warning, and the
+                  circle is invisible to a non-member — so the people and their
+                  reading simply vanished, with the code the only way back. */}
+              {leaving ? (
+                <Card style={styles.leaveConfirm}>
+                  <ThemedText type="smallBold">Leave {circle.name}?</ThemedText>
+                  <ThemedText type="small" themeColor="textSecondary">
+                    You stop seeing everyone&rsquo;s reading, and they stop seeing yours. Your own
+                    reading stays. Getting back in needs the invite code {circle.joinCode}.
+                  </ThemedText>
+                  <View style={styles.leaveRow}>
+                    <Pressable
+                      onPress={() => setLeaving(false)}
+                      accessibilityRole="button"
+                      style={styles.quiet}
+                    >
+                      <ThemedText type="smallBold" themeColor="accent">
+                        Stay
+                      </ThemedText>
+                    </Pressable>
+                    <Pressable
+                      onPress={() => {
+                        setLeaving(false);
+                        void run('leave', () => leaveCircle(circle.id));
+                      }}
+                      accessibilityRole="button"
+                      disabled={busy !== undefined}
+                      style={styles.quiet}
+                    >
+                      <ThemedText type="smallBold" style={{ color: theme.redLetter }}>
+                        Leave
+                      </ThemedText>
+                    </Pressable>
+                  </View>
+                </Card>
+              ) : (
+                <Pressable
+                  onPress={() => setLeaving(true)}
+                  accessibilityRole="button"
+                  style={styles.quiet}
+                >
+                  <ThemedText type="small" themeColor="textFaint">
+                    Leave this circle
+                  </ThemedText>
+                </Pressable>
+              )}
             </>
           ) : (
             <>
@@ -523,6 +650,8 @@ const styles = StyleSheet.create({
   },
   memberTop: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three, minHeight: 56 },
   memberActions: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: Spacing.two },
+  leaveConfirm: { gap: Spacing.two, padding: Spacing.three },
+  leaveRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   dot: { width: 10, height: 10, borderRadius: 5 },
   grow: { flexGrow: 1, flexShrink: 1, gap: Spacing.half },
   code: {
@@ -542,6 +671,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
   },
   codeInput: { fontSize: 24, letterSpacing: 6, textAlign: 'center' },
+  switcher: { flexDirection: 'row', gap: Spacing.two, flexWrap: 'wrap' },
   kinds: { flexDirection: 'row', gap: Spacing.two, flexWrap: 'wrap' },
   kind: {
     paddingHorizontal: Spacing.three,

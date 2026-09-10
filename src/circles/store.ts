@@ -23,6 +23,12 @@ export type Circle = {
   readonly kind: CircleKind;
   readonly joinCode: string;
   readonly createdBy: string;
+  /**
+   * The plan the circle reads together, or undefined when it has not agreed
+   * one and everyone keeps their own. Set by whoever started the circle.
+   */
+  readonly planId?: string;
+  readonly planStartedOn?: string;
 };
 
 export type Member = {
@@ -37,6 +43,8 @@ type CircleRow = {
   kind: string;
   join_code: string;
   created_by: string;
+  plan_id?: string | null;
+  plan_started_on?: string | null;
 };
 
 const toCircle = (row: CircleRow): Circle => ({
@@ -45,13 +53,15 @@ const toCircle = (row: CircleRow): Circle => ({
   kind: row.kind as CircleKind,
   joinCode: row.join_code,
   createdBy: row.created_by,
+  planId: row.plan_id ?? undefined,
+  planStartedOn: row.plan_started_on ?? undefined,
 });
 
 /** The circles you belong to. RLS makes the filter unnecessary. */
 export async function myCircles(): Promise<Circle[]> {
   const { data, error } = await supabase
     .from('circles')
-    .select('id, name, kind, join_code, created_by')
+    .select('id, name, kind, join_code, created_by, plan_id, plan_started_on')
     .order('created_at');
   if (error) throw new Error(error.message);
   return (data ?? []).map(toCircle);
@@ -65,7 +75,7 @@ export async function createCircle(name: string, kind: CircleKind): Promise<Circ
   const { data, error } = await supabase
     .from('circles')
     .insert({ name: name.trim(), kind, created_by: id })
-    .select('id, name, kind, join_code, created_by')
+    .select('id, name, kind, join_code, created_by, plan_id, plan_started_on')
     .single();
   if (error) throw new Error(error.message);
   return toCircle(data);
@@ -219,5 +229,36 @@ export async function removeMember(circleId: string, userId: string): Promise<vo
     .delete()
     .eq('circle_id', circleId)
     .eq('user_id', userId);
+  if (error) throw new Error(error.message);
+}
+
+
+/**
+ * Agree the circle's plan, or take it away again.
+ *
+ * Only the owner may: `circles_owner_updates` decides that, not this function.
+ * Choosing a plan starts it today for everyone, for the same reason choosing
+ * one for yourself does — day one is the day the circle decided, not a date
+ * carried over from something abandoned.
+ */
+export async function setCirclePlan(circleId: string, planId: string | undefined): Promise<void> {
+  const today = new Date().toISOString().slice(0, 10);
+  const { error } = await supabase
+    .from('circles')
+    .update(
+      planId
+        ? { plan_id: planId, plan_started_on: today }
+        : { plan_id: null, plan_started_on: null },
+    )
+    .eq('id', circleId);
+  if (error) throw new Error(error.message);
+}
+
+/** Rename a circle. The owner's to do, again decided by the policy. */
+export async function renameCircle(circleId: string, name: string): Promise<void> {
+  const { error } = await supabase
+    .from('circles')
+    .update({ name: name.trim() })
+    .eq('id', circleId);
   if (error) throw new Error(error.message);
 }

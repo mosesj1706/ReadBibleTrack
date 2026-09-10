@@ -34,7 +34,7 @@ export default function PlanScreen() {
   const onScroll = useAnimatedScrollHandler((event) => {
     scrolled.value = event.contentOffset.y;
   });
-  const { plan: current, choose } = usePlan();
+  const { plan: current, choose, sharedWith, canChoose } = usePlan();
 
   return (
     <Ground style={styles.screen} scroll={scrolled}>
@@ -60,8 +60,11 @@ export default function PlanScreen() {
             What shall we read?
           </ThemedText>
           <ThemedText type="small" themeColor="textSecondary">
-            Choosing a plan starts it today. Everything already read stays read —
-            progress is kept as verses, not as a position in a plan.
+            {sharedWith
+              ? canChoose
+                ? `Everyone in ${sharedWith} reads this one. Choosing another moves the whole circle, starting today.`
+                : `${sharedWith} reads this one together. Whoever started the circle chooses it.`
+              : 'Choosing a plan starts it today. Everything already read stays read — progress is kept as verses, not as a position in a plan.'}
           </ThemedText>
 
           <View style={styles.list}>
@@ -78,8 +81,9 @@ export default function PlanScreen() {
                     choose(plan.id);
                     leave();
                   }}
+                  disabled={!canChoose}
                   accessibilityRole="button"
-                  accessibilityState={{ selected }}
+                  accessibilityState={{ selected, disabled: !canChoose }}
                   style={styles.fill}
                 >
                   <Card
