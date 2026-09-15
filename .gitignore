@@ -34,6 +34,10 @@ yarn-error.*
 .env*.local
 # Backups of an env file are still an env file.
 .env*.bak
+# The build scripts move .env.local aside under these names while they run. A
+# `git add -A` in that window committed one; the pattern above does not match
+# a name that ends in something other than .local.
+.env.local.*
 # SMTP credentials for `supabase config push`. Deliberately not named
 # .env-anything: Expo pulls every .env* at the root into the bundler graph and
 # then fails trying to parse it as JavaScript.
