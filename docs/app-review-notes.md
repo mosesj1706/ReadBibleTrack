@@ -56,7 +56,14 @@ Demo account, also entered in the Sign-In Information fields:
 - **Circle** — the demo account is in a circle called "The kitchen table" with
   two other readers, Hannah and Sam, all three at different points. This screen
   shows their progress, the invite code, and — because the demo account owns
-  this circle — the control to remove a member.
+  this circle — the control to remove a member. A person can be in more than
+  one circle; pills at the top switch between them. Tapping a member's name
+  opens their reading book by book, and a book opens into its chapters.
+- **A circle's plan** — whoever starts a circle can choose what it reads
+  together, either from the presets or by building a plan of their own (any
+  books, over any number of days). Everyone in the circle then reads that
+  plan, and the circle's progress is measured against it. The Plan tab shows
+  whose plan is in force.
 - **You** — the account, and "Delete my account" at the foot, which is
   immediate and permanent.
 
@@ -137,12 +144,15 @@ A run that covers everything they listed, in order:
    and show both **Report it** and **Block**. Report one, so the confirmation
    is on camera.
 8. **Circle** tab — the members, their progress, the invite code, and the
-   **Remove from circle** control on a member.
-9. **You** tab — scroll to the foot, tap **"Delete my account"**, and show the
-   confirmation panel that explains what it does. *Do not confirm it* — the
-   demo account is needed for review. Showing the flow and the warning is what
-   they are asking for.
-10. Stop recording.
+   **Remove from circle** control on a member. Tap **Hannah** to show her
+   reading book by book, tap a book to open its chapters, then come back.
+9. *(Optional, ten seconds.)* Scroll to **Start another**, type a name, and
+   show the **"What will you read?"** plan pills. No need to create it.
+10. **You** tab — scroll to the foot, tap **"Delete my account"**, and show the
+    confirmation panel that explains what it does. *Do not confirm it* — the
+    demo account is needed for review. Showing the flow and the warning is what
+    they are asking for.
+11. Stop recording.
 
 Upload it somewhere with a plain link — Apple accepts a link in the Resolution
 Center reply.
