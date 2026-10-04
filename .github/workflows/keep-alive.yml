@@ -1,0 +1,44 @@
+# Keep the hosted database from pausing.
+#
+# Supabase's free plan switches a project off after seven days with no
+# activity. That happened once, from 15 September to 4 October 2026, and while
+# it is off nobody can sign in: the only way into this app is an emailed code,
+# and the code comes from the server. A quiet week — which is what the days
+# around an App Store review look like — was enough to lock everyone out.
+#
+# So once a day this asks the database one small question. It uses the
+# publishable key, the same one shipped inside every copy of the app, and row-
+# level security answers it with an empty list. That is still a real query, and
+# a real query is all the inactivity clock is counting.
+#
+# It is a workaround. The paid plan does not pause at all; this is the stand-in
+# until that is worth paying for.
+
+name: Keep the database awake
+
+on:
+  schedule:
+    # Off the hour on purpose: GitHub delays jobs queued at :00, when everyone's
+    # cron fires at once.
+    - cron: '17 6 * * *'
+  # And by hand, from the Actions tab, to check it works.
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Ask the database something
+        env:
+          URL: https://lfkdptwvuelclxiwessj.supabase.co
+          KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
+        run: |
+          code=$(curl -s -o /dev/null -w '%{http_code}' \
+            "$URL/rest/v1/circles?select=id&limit=1" \
+            -H "apikey: $KEY" -H "Authorization: Bearer $KEY")
+          echo "database answered $code"
+          # Failing loudly matters as much as the ping. If the project has
+          # paused anyway, this run goes red and GitHub sends an email — which
+          # is how you find out before the people trying to sign in do.
+          test "$code" = "200"
