@@ -246,6 +246,10 @@ const styles = StyleSheet.create({
     borderRadius: Spacing.two,
     padding: Spacing.three,
     minHeight: 96,
+    // Capped, so a long note scrolls inside the box instead of growing the
+    // sheet up past the top of the screen once the keyboard has taken half of
+    // it.
+    maxHeight: 160,
     fontSize: 16,
     textAlignVertical: 'top',
   },

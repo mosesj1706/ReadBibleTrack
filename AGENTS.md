@@ -18,6 +18,14 @@ before writing Expo code — the API has moved a lot.
   code shipped at 34px in a 24px box and lost the tops of its letters. Plain
   `TextInput`s inherit nothing and want no `lineHeight`; forcing one on Android
   clips them instead.
+- Every screen with a `TextInput` has to handle the keyboard, and on a phone
+  nobody notices until they type. Three screens shipped with the keyboard
+  covering the field or the button after it. A centred screen wants a
+  `KeyboardAvoidingView`; a scroll view wants `automaticallyAdjustKeyboardInsets`
+  and `keyboardShouldPersistTaps="handled"` — without the second, the first tap
+  on a button only puts the keyboard away. An absolutely positioned sheet
+  ignores both, because an absolute child is laid out against its parent's
+  edge; lift it with Reanimated's `useAnimatedKeyboard`, as the verse sheet does.
 
 ## Tests
 

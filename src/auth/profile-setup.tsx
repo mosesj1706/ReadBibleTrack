@@ -6,7 +6,15 @@
  */
 
 import { useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, TextInput, View } from 'react-native';
+import {
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  StyleSheet,
+  TextInput,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
@@ -39,91 +47,98 @@ export function ProfileSetupScreen() {
 
   return (
     <ThemedView style={styles.screen}>
-      <SafeAreaView style={styles.container}>
-        <View style={styles.header}>
-          <ThemedText type="small" themeColor="textFaint" style={styles.eyebrow}>
-            Signed in as {session?.user.email}
-          </ThemedText>
-          <ThemedText type="title" style={[styles.title, { fontFamily: Fonts.serif }]}>
-            What should we call you?
-          </ThemedText>
-          <ThemedText themeColor="textSecondary" style={styles.blurb}>
-            This is the name your circle sees next to what you’ve read. First
-            names are usually right.
-          </ThemedText>
-        </View>
-
-        <View style={styles.form}>
-          <TextInput
-            style={[
-              styles.input,
-              {
-                backgroundColor: theme.backgroundElement,
-                borderColor: theme.border,
-                color: theme.text,
-                fontFamily: Fonts.serif,
-              },
-            ]}
-            value={name}
-            onChangeText={setName}
-            placeholder="Anna"
-            placeholderTextColor={theme.textFaint}
-            autoCapitalize="words"
-            autoComplete="name"
-            maxLength={60}
-            editable={!busy}
-            autoFocus
-            returnKeyType="done"
-            onSubmitEditing={() => usable && save()}
-          />
-
-          <Pressable
-            onPress={save}
-            disabled={!usable || busy}
-            accessibilityRole="button"
-            accessibilityState={{ disabled: !usable || busy, busy }}
-            style={[
-              styles.action,
-              { backgroundColor: !usable || busy ? theme.backgroundSelected : theme.accent },
-            ]}
-          >
-            {busy ? (
-              <ActivityIndicator color={theme.background} />
-            ) : (
-              <ThemedText
-                type="smallBold"
-                style={{ color: !usable ? theme.textFaint : theme.background }}
-              >
-                Continue
-              </ThemedText>
-            )}
-          </Pressable>
-
-          <Pressable onPress={() => void signOut()} accessibilityRole="button">
-            <ThemedText type="small" themeColor="textFaint" style={styles.back}>
-              Sign out
+      {/* The same centred layout as the sign-in screen, and the same fix: the
+          keyboard otherwise sits over the button you need next. */}
+      <KeyboardAvoidingView
+        style={styles.avoider}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
+        <SafeAreaView style={styles.container}>
+          <View style={styles.header}>
+            <ThemedText type="small" themeColor="textFaint" style={styles.eyebrow}>
+              Signed in as {session?.user.email}
             </ThemedText>
-          </Pressable>
-        </View>
-
-        {problem ? (
-          <View style={[styles.problem, { borderLeftColor: theme.redLetter }]}>
-            <ThemedText type="small" style={{ color: theme.redLetter }}>
-              {problem}
+            <ThemedText type="title" style={[styles.title, { fontFamily: Fonts.serif }]}>
+              What should we call you?
+            </ThemedText>
+            <ThemedText themeColor="textSecondary" style={styles.blurb}>
+              This is the name your circle sees next to what you’ve read. First
+              names are usually right.
             </ThemedText>
           </View>
-        ) : null}
-      </SafeAreaView>
+
+          <View style={styles.form}>
+            <TextInput
+              style={[
+                styles.input,
+                {
+                  backgroundColor: theme.backgroundElement,
+                  borderColor: theme.border,
+                  color: theme.text,
+                  fontFamily: Fonts.serif,
+                },
+              ]}
+              value={name}
+              onChangeText={setName}
+              placeholder="Anna"
+              placeholderTextColor={theme.textFaint}
+              autoCapitalize="words"
+              autoComplete="name"
+              maxLength={60}
+              editable={!busy}
+              autoFocus
+              returnKeyType="done"
+              onSubmitEditing={() => usable && save()}
+            />
+
+            <Pressable
+              onPress={save}
+              disabled={!usable || busy}
+              accessibilityRole="button"
+              accessibilityState={{ disabled: !usable || busy, busy }}
+              style={[
+                styles.action,
+                { backgroundColor: !usable || busy ? theme.backgroundSelected : theme.accent },
+              ]}
+            >
+              {busy ? (
+                <ActivityIndicator color={theme.background} />
+              ) : (
+                <ThemedText
+                  type="smallBold"
+                  style={{ color: !usable ? theme.textFaint : theme.background }}
+                >
+                  Continue
+                </ThemedText>
+              )}
+            </Pressable>
+
+            <Pressable onPress={() => void signOut()} accessibilityRole="button">
+              <ThemedText type="small" themeColor="textFaint" style={styles.back}>
+                Sign out
+              </ThemedText>
+            </Pressable>
+          </View>
+
+          {problem ? (
+            <View style={[styles.problem, { borderLeftColor: theme.redLetter }]}>
+              <ThemedText type="small" style={{ color: theme.redLetter }}>
+                {problem}
+              </ThemedText>
+            </View>
+          ) : null}
+        </SafeAreaView>
+      </KeyboardAvoidingView>
     </ThemedView>
   );
 }
 
 const styles = StyleSheet.create({
   screen: { flex: 1, flexDirection: 'row', justifyContent: 'center' },
+  avoider: { flex: 1, width: '100%', maxWidth: MaxContentWidth },
   container: {
     flex: 1,
     width: '100%',
-    maxWidth: MaxContentWidth,
     paddingHorizontal: Spacing.four,
     justifyContent: 'center',
     gap: Spacing.five,

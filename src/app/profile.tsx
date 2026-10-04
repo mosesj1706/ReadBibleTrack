@@ -78,6 +78,11 @@ export default function ProfileScreen() {
       <SafeAreaView style={styles.frame}>
 
         <Animated.ScrollView
+          // iOS moves the focused field above the keyboard; and a tap on a
+          // button lands while the keyboard is up, rather than the first tap
+          // only putting the keyboard away.
+          automaticallyAdjustKeyboardInsets
+          keyboardShouldPersistTaps="handled"
           onScroll={onScroll}
           scrollEventThrottle={16}
           contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>

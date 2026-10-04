@@ -14,8 +14,10 @@ import { AppState, Pressable, StyleSheet, View, useWindowDimensions } from 'reac
 import type { ScrollView } from 'react-native';
 import {
   runOnJS,
+  useAnimatedKeyboard,
   useAnimatedRef,
   useAnimatedScrollHandler,
+  useAnimatedStyle,
   useSharedValue,
 } from 'react-native-reanimated';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -103,6 +105,16 @@ export default function ReaderScreen() {
   const theme = useTheme();
   const { ranges, mark, unmark, keepPlace } = useProgress();
   const insets = useSafeAreaInsets();
+  // The verse sheet rides on top of the keyboard. It is absolutely positioned,
+  // so neither a KeyboardAvoidingView nor safe-area padding can reach it — an
+  // absolute child is laid out against its parent's edge, not inside its
+  // padding, which is the same trap the drawer fell into. Without this, tapping
+  // "Note" raised the keyboard straight over the box being typed into. Tracked
+  // on the UI thread, so the sheet rises with the keyboard rather than after.
+  const keyboard = useAnimatedKeyboard();
+  const aboveKeyboard = useAnimatedStyle(() => ({
+    transform: [{ translateY: -keyboard.height.value }],
+  }));
   const params = useLocalSearchParams<{ reference: string }>();
 
   // A reference may name any span; the reader shows the chapter it starts in.
@@ -446,11 +458,11 @@ export default function ReaderScreen() {
             just tapped, and hunting for it at the end of a 176-verse chapter is
             not an interaction. */}
         {selected !== undefined ? (
-          <View style={[styles.sheetHolder, { pointerEvents: 'box-none' }]}>
+          <Animated.View style={[styles.sheetHolder, aboveKeyboard, { pointerEvents: 'box-none' }]}>
             <SlideIn visible fromY={28}>
               <VerseActions verseId={selected} onClose={() => setSelected(undefined)} />
             </SlideIn>
-          </View>
+          </Animated.View>
         ) : null}
       </SafeAreaView>
     </Ground>
