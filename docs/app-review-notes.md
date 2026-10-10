@@ -40,8 +40,9 @@ six-digit code to it, and that code is the only way in.
 Demo account, also entered in the Sign-In Information fields:
 
 - Email: `readbibletrackreview@gmail.com`
-- Password: `Freshone@1` — this is the password for that **Gmail account**, so
-  the code can be read. Sign in at gmail.com with the same address and
+- Password: entered in App Store Connect's Sign-In Information, **never here**
+  — this repository is public. It is the password for that **Gmail account**,
+  so the code can be read: sign in at gmail.com with the same address and
   password, and the code is in the inbox.
 - Codes last one hour. Requesting a second invalidates the first, so please use
   the newest message in the inbox.
