@@ -125,6 +125,50 @@ and the app carries no third-party copyrighted text beyond these.
 
 ---
 
+## For the Notes field
+
+App Store Connect caps App Review Information → Notes at 4,000 characters, and
+sections 2–6 above run to over 5,000 — pasted whole, they would be cut off
+partway through, most likely in the reporting and blocking part, which is the
+part that matters. This is the same content, shortened to fit. The symbols are
+spelled out ("flag control", "pencil button") because a reviewer will not know
+what ⚑ and ✎ mean. The demo password is not in here: it belongs in the
+Sign-In Information fields, and this repository is public.
+
+```
+SIGNING IN
+There is no password. Entering an email address sends a six-digit code, and that code is the only way in. Use the demo account in Sign-In Information: enter that email in the app, then open Gmail with the same address and password to read the code. Codes last an hour, and requesting another invalidates the first, so please use the newest email.
+
+WHAT THE APP IS FOR
+Reading the Bible alongside the people you read it with: a couple, a household, a few friends. It answers "where have you got to?" quietly, so nobody has to chase anyone. The whole Bible ships inside the app in three translations, so reading works with no connection.
+
+WHERE TO LOOK
+- Today: what to read next, and the opening of the passage.
+- Read: every book and chapter, with checkboxes for reading done in a paper Bible.
+- A chapter: tap a verse to highlight it, favourite it, write a note, or mark "Read to here".
+- Circle: the demo account owns a circle called "The kitchen table" with Hannah and Sam. It shows everyone's progress against the circle's plan, the invite code, and "Remove from circle" under a member. Tap a member to see their reading book by book. A person can be in several circles: pills at the top switch between them, and "Start another" and "Join another" are on the same screen.
+- Plan: a circle's owner chooses what the circle reads together, either a preset or "Build your own" (any books, over any number of days).
+- You: the account, with "Delete my account" at the foot, which is immediate and permanent.
+
+USER-GENERATED CONTENT
+A note or highlight is private unless "Share with circle" is switched on, and is only ever visible to people who joined that circle with an invite code. There is no public feed and no discovery. Every shared note and highlight carries a flag control in the chapter's notes panel (the pencil button at the top of the reader):
+- Report it: files a report containing a copy of the text, read by the developer. Contact: readbibletrack@gmail.com, also published on the support page.
+- Block [name]: hides everything that person shares, in both directions, immediately.
+The circle's owner can also remove a member, and anyone can leave a circle.
+To see this: open Genesis 12 (Hannah's shared note) or Genesis 1 (Sam's shared highlight), then the notes panel.
+
+EXTERNAL SERVICES
+Supabase (database and sign-in), Resend (sends the sign-in email only), and Amazon CloudFront, S3 and Route 53 (the website hosting the privacy policy and support page). No analytics, advertising, crash reporting, AI, payments or tracking SDKs of any kind. The Bible text is bundled, so reading makes no network request.
+
+REGIONAL DIFFERENCES
+None. Every feature and all content is identical in every region. The app is in English.
+
+REGULATED INDUSTRY AND THIRD-PARTY MATERIAL
+Not a regulated industry: no payments, no medical, legal or financial advice, and no health data. The three bundled translations, the Berean Standard Bible, King James Version and World English Bible, are public domain and free to distribute.
+```
+
+---
+
 ## Recording the video
 
 Apple wants a screen recording made **on a physical device**, beginning with
