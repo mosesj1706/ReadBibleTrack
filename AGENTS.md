@@ -91,8 +91,11 @@ means nobody but the developer can sign in. Resend approved immediately.
 password.
 
 SES is still fully configured and unused: its domain identity, DKIM,
-configuration set and bounce topic are all intact, so going back is one
-`config push`. The previous credentials are in `.smtp.local.ses-backup`.
+configuration set and bounce topic are all intact. The previous credentials are
+in `.smtp.local.ses-backup`, but the IAM access key behind them
+(`readbibletrack-smtp`) was **deactivated** on 2026-10-10, because an unused
+live credential is only risk. Going back is: reactivate that key in IAM, then
+one `config push` — skip the first step and every code fails to send.
 
 Mail is sent as `noreply@readbibletrack.com`, and the domain is why it arrives
 at all. Sending as a `@gmail.com` address fails SPF — Google's SPF lists
